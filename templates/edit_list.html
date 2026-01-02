@@ -122,10 +122,17 @@ bulkCancel.addEventListener('click', () => {
     bulkStatus.classList.add('hidden');
 });
 
+// Helper to add delay between requests
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 // Bulk add functionality
 bulkAddBtn.addEventListener('click', async () => {
     const lines = bulkInput.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return;
+    if (lines.length === 0) {
+        bulkStatus.classList.remove('hidden');
+        bulkStatus.textContent = 'Please paste some song names first';
+        return;
+    }
 
     bulkAddBtn.disabled = true;
     bulkAddBtn.textContent = 'Adding...';
@@ -141,6 +148,13 @@ bulkAddBtn.addEventListener('click', async () => {
         try {
             // Search for the song
             const searchRes = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`);
+
+            if (!searchRes.ok) {
+                failed.push(query + ' (search error)');
+                await delay(200);
+                continue;
+            }
+
             const data = await searchRes.json();
 
             if (data.tracks && data.tracks.length > 0) {
@@ -164,13 +178,17 @@ bulkAddBtn.addEventListener('click', async () => {
                     addItemToDOM(addData.item);
                     added++;
                 } else {
-                    failed.push(query);
+                    failed.push(query + ' (add error)');
                 }
             } else {
                 failed.push(query);
             }
+
+            // Small delay to avoid rate limiting
+            await delay(150);
         } catch (e) {
-            failed.push(query);
+            console.error('Bulk add error:', e);
+            failed.push(query + ' (error)');
         }
     }
 
@@ -179,10 +197,10 @@ bulkAddBtn.addEventListener('click', async () => {
 
     let statusMsg = `Added ${added} song${added !== 1 ? 's' : ''}.`;
     if (failed.length > 0) {
-        statusMsg += ` Failed to find: ${failed.join(', ')}`;
+        statusMsg += ` Failed: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '...' : ''}`;
     }
     bulkStatus.textContent = statusMsg;
-    bulkInput.value = '';
+    if (added > 0) bulkInput.value = '';
 });
 
 // Initialize SortableJS for drag and drop

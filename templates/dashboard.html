@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}My Lists - Jukebox{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="text-3xl font-bold text-dark">My Lists</h1>
+    <a href="{{ url_for('create_list') }}" class="bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
+        + New List
+    </a>
+</div>
+
+{% if lists %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for list in lists %}
+        <div class="bg-cardbg rounded-lg shadow-md overflow-hidden border-l-4 border-dark">
+            <a href="{{ url_for('view_list', list_id=list.id) }}" class="block p-5 hover:bg-khakilight transition">
+                <div class="flex justify-between items-start">
+                    <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
+                    <span class="text-xs px-2 py-1 rounded {% if list.is_public %}bg-dark text-khaki{% else %}bg-khaki text-dark{% endif %}">
+                        {{ 'Public' if list.is_public else 'Private' }}
+                    </span>
+                </div>
+                {% if list.description %}
+                    <p class="text-sm text-forest mt-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+                {% endif %}
+                <p class="text-xs text-forest mt-3 font-medium">
+                    {{ 'Ranked' if list.is_ranked else 'Unranked' }} list
+                </p>
+            </a>
+            <div class="border-t border-khaki px-5 py-3 bg-khakilight">
+                <a href="{{ url_for('edit_list', list_id=list.id) }}" class="text-sm text-dark font-medium hover:underline">Edit</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
+        <p class="text-xl text-forest mb-4">You haven't created any lists yet</p>
+        <a href="{{ url_for('create_list') }}" class="bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
+            Create your first list
+        </a>
+    </div>
+{% endif %}
+{% endblock %}

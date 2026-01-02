@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Edit: {{ list.title }} - Jukebox{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-dark">{{ list.title }}</h1>
+        <a href="{{ url_for('view_list', list_id=list.id) }}" class="text-dark font-medium hover:underline">View List</a>
+    </div>
+</div>
+
+<!-- Search Section -->
+<div class="bg-cardbg rounded-lg shadow-md p-6 mb-8 border-l-4 border-dark">
+    <h2 class="text-lg font-bold text-dark mb-4">Add Songs</h2>
+
+    <!-- Single Search -->
+    <div class="relative mb-4">
+        <input type="text" id="search-input"
+               class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
+               placeholder="Search for a song or artist...">
+        <div id="search-results" class="absolute z-10 w-full bg-cardbg border border-forest rounded-lg shadow-lg mt-1 hidden max-h-80 overflow-y-auto">
+        </div>
+    </div>
+
+    <!-- Bulk Add Toggle -->
+    <button type="button" id="toggle-bulk" class="text-sm text-dark font-medium hover:underline mb-3">
+        + Bulk add multiple songs
+    </button>
+
+    <!-- Bulk Add Section (hidden by default) -->
+    <div id="bulk-section" class="hidden">
+        <textarea id="bulk-input" rows="6"
+                  class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark mb-3"
+                  placeholder="Paste song names here, one per line:&#10;Song Name - Artist&#10;Another Song - Another Artist&#10;Just Song Name"></textarea>
+        <div class="flex gap-3">
+            <button type="button" id="bulk-add-btn" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
+                Search & Add All
+            </button>
+            <button type="button" id="bulk-cancel" class="text-dark font-medium hover:underline">
+                Cancel
+            </button>
+        </div>
+        <div id="bulk-status" class="mt-3 text-sm text-forest hidden"></div>
+    </div>
+</div>
+
+<!-- Current Items -->
+<div class="bg-cardbg rounded-lg shadow-md p-6">
+    <h2 class="text-lg font-bold text-dark mb-4">
+        Songs in List
+        <span class="text-sm font-normal text-forest">(<span id="item-count">{{ items|length }}</span> songs)</span>
+    </h2>
+
+    <div id="items-container">
+        {% if items %}
+            {% for item in items %}
+            <div class="flex items-center gap-4 py-3 border-b border-khaki item-row cursor-grab active:cursor-grabbing" data-id="{{ item.id }}">
+                <!-- Drag Handle -->
+                <div class="drag-handle text-forest hover:text-dark px-1">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                    </svg>
+                </div>
+
+                {% if list.is_ranked %}
+                <div class="w-8 text-center font-bold text-dark position-display">{{ item.position }}</div>
+                {% endif %}
+
+                <img src="{{ item.album_art_url or '' }}" alt=""
+                     class="w-12 h-12 rounded object-cover {% if not item.album_art_url %}bg-khaki{% endif %}">
+
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-dark truncate">{{ item.track_name }}</p>
+                    <p class="text-sm text-forest truncate">{{ item.artist_name }}</p>
+                </div>
+
+                <button onclick="removeItem('{{ item.id }}')"
+                        class="text-brown hover:text-red-600 px-3 py-1 font-medium transition">
+                    Remove
+                </button>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p id="empty-message" class="text-forest text-center py-8">No songs yet. Search above to add some!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- SortableJS for drag and drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+const listId = "{{ list.id }}";
+const isRanked = {{ 'true' if list.is_ranked else 'false' }};
+let searchTimeout;
+
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+const itemsContainer = document.getElementById('items-container');
+const itemCount = document.getElementById('item-count');
+
+// Bulk add elements
+const toggleBulk = document.getElementById('toggle-bulk');
+const bulkSection = document.getElementById('bulk-section');
+const bulkInput = document.getElementById('bulk-input');
+const bulkAddBtn = document.getElementById('bulk-add-btn');
+const bulkCancel = document.getElementById('bulk-cancel');
+const bulkStatus = document.getElementById('bulk-status');
+
+// Toggle bulk section
+toggleBulk.addEventListener('click', () => {
+    bulkSection.classList.toggle('hidden');
+    toggleBulk.textContent = bulkSection.classList.contains('hidden') ? '+ Bulk add multiple songs' : '− Hide bulk add';
+});
+
+bulkCancel.addEventListener('click', () => {
+    bulkSection.classList.add('hidden');
+    toggleBulk.textContent = '+ Bulk add multiple songs';
+    bulkInput.value = '';
+    bulkStatus.classList.add('hidden');
+});
+
+// Bulk add functionality
+bulkAddBtn.addEventListener('click', async () => {
+    const lines = bulkInput.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+
+    bulkAddBtn.disabled = true;
+    bulkAddBtn.textContent = 'Adding...';
+    bulkStatus.classList.remove('hidden');
+
+    let added = 0;
+    let failed = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const query = lines[i];
+        bulkStatus.textContent = `Searching ${i + 1}/${lines.length}: "${query}"...`;
+
+        try {
+            // Search for the song
+            const searchRes = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`);
+            const data = await searchRes.json();
+
+            if (data.tracks && data.tracks.length > 0) {
+                const track = data.tracks[0]; // Take first result
+
+                // Add to list
+                const addRes = await fetch(`/api/list/${listId}/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        track_id: track.id,
+                        track_name: track.name,
+                        artist_name: track.artist,
+                        album_name: track.album,
+                        album_art_url: track.album_art
+                    })
+                });
+                const addData = await addRes.json();
+
+                if (addData.success && addData.item) {
+                    addItemToDOM(addData.item);
+                    added++;
+                } else {
+                    failed.push(query);
+                }
+            } else {
+                failed.push(query);
+            }
+        } catch (e) {
+            failed.push(query);
+        }
+    }
+
+    bulkAddBtn.disabled = false;
+    bulkAddBtn.textContent = 'Search & Add All';
+
+    let statusMsg = `Added ${added} song${added !== 1 ? 's' : ''}.`;
+    if (failed.length > 0) {
+        statusMsg += ` Failed to find: ${failed.join(', ')}`;
+    }
+    bulkStatus.textContent = statusMsg;
+    bulkInput.value = '';
+});
+
+// Initialize SortableJS for drag and drop
+const sortable = new Sortable(itemsContainer, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'bg-khakilight',
+    onEnd: function(evt) {
+        // Update positions after drag
+        const rows = itemsContainer.querySelectorAll('.item-row');
+        const newOrder = [];
+
+        rows.forEach((row, index) => {
+            const itemId = row.dataset.id;
+            const newPosition = index + 1;
+            newOrder.push({ item_id: itemId, position: newPosition });
+
+            // Update displayed position
+            const posDisplay = row.querySelector('.position-display');
+            if (posDisplay) posDisplay.textContent = newPosition;
+        });
+
+        // Send reorder request
+        fetch(`/api/list/${listId}/reorder-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: newOrder })
+        });
+    }
+});
+
+// Search functionality
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+
+    if (query.length < 2) {
+        searchResults.classList.add('hidden');
+        return;
+    }
+
+    searchTimeout = setTimeout(() => {
+        fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.tracks && data.tracks.length > 0) {
+                    searchResults.innerHTML = data.tracks.map(track => `
+                        <div class="flex items-center gap-3 p-3 hover:bg-khakilight cursor-pointer transition"
+                             onclick="addTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
+                            <img src="${track.album_art || ''}" alt="" class="w-10 h-10 rounded object-cover">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium text-dark truncate">${track.name}</p>
+                                <p class="text-sm text-forest truncate">${track.artist}</p>
+                            </div>
+                            <span class="text-dark font-semibold text-sm">+ Add</span>
+                        </div>
+                    `).join('');
+                    searchResults.classList.remove('hidden');
+                } else {
+                    searchResults.innerHTML = '<p class="p-4 text-forest">No results found</p>';
+                    searchResults.classList.remove('hidden');
+                }
+            });
+    }, 300);
+});
+
+// Click outside to close search
+document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.add('hidden');
+    }
+});
+
+function addItemToDOM(item) {
+    // Remove empty message if present
+    const emptyMsg = document.getElementById('empty-message');
+    if (emptyMsg) emptyMsg.remove();
+
+    const html = `
+        <div class="flex items-center gap-4 py-3 border-b border-khaki item-row cursor-grab active:cursor-grabbing" data-id="${item.id}">
+            <div class="drag-handle text-forest hover:text-dark px-1">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                </svg>
+            </div>
+            ${isRanked ? `<div class="w-8 text-center font-bold text-dark position-display">${item.position}</div>` : ''}
+            <img src="${item.album_art_url || ''}" alt=""
+                 class="w-12 h-12 rounded object-cover ${!item.album_art_url ? 'bg-khaki' : ''}">
+            <div class="flex-1 min-w-0">
+                <p class="font-medium text-dark truncate">${item.track_name}</p>
+                <p class="text-sm text-forest truncate">${item.artist_name}</p>
+            </div>
+            <button onclick="removeItem('${item.id}')"
+                    class="text-brown hover:text-red-600 px-3 py-1 font-medium transition">
+                Remove
+            </button>
+        </div>
+    `;
+    itemsContainer.insertAdjacentHTML('beforeend', html);
+    updateItemCount(1);
+}
+
+function addTrack(track) {
+    fetch(`/api/list/${listId}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            track_id: track.id,
+            track_name: track.name,
+            artist_name: track.artist,
+            album_name: track.album,
+            album_art_url: track.album_art
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.item) {
+            addItemToDOM(data.item);
+            searchInput.value = '';
+            searchResults.classList.add('hidden');
+        }
+    });
+}
+
+function removeItem(itemId) {
+    if (!confirm('Remove this song?')) return;
+
+    fetch(`/api/list/${listId}/remove/${itemId}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelector(`.item-row[data-id="${itemId}"]`).remove();
+                updateItemCount(-1);
+            }
+        });
+}
+
+function updateItemCount(delta) {
+    const current = parseInt(itemCount.textContent) || 0;
+    itemCount.textContent = current + delta;
+}
+
+</script>
+{% endblock %}

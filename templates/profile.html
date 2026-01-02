@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile.username }} - Jukebox{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-dark">{{ profile.username }}</h1>
+    {% if profile.bio %}
+        <p class="text-forest mt-2">{{ profile.bio }}</p>
+    {% endif %}
+</div>
+
+{% if lists %}
+    <h2 class="text-sm font-semibold text-dark uppercase tracking-wider mb-4">Public Lists</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for list in lists %}
+        <a href="{{ url_for('view_list', list_id=list.id) }}" class="bg-cardbg rounded-lg p-5 shadow-md hover:shadow-lg transition border-l-4 border-dark">
+            <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
+            {% if list.description %}
+                <p class="text-sm text-forest mt-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+            {% endif %}
+            <p class="text-xs text-forest mt-3 font-medium">
+                {{ 'Ranked' if list.is_ranked else 'Unranked' }} list
+            </p>
+        </a>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
+        <p class="text-xl text-forest">No public lists yet</p>
+    </div>
+{% endif %}
+{% endblock %}

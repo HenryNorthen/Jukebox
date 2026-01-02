@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center py-16">
+    <h1 class="text-5xl font-bold text-dark mb-4">Jukebox</h1>
+    <p class="text-xl text-forest mb-8">Write and share reviews. Compile your own lists. Share your life in music.</p>
+
+    {% if not session.user %}
+        <div class="space-x-4">
+            <a href="{{ url_for('signup') }}" class="bg-dark text-khaki px-8 py-3 rounded text-lg font-semibold hover:bg-forest transition">Get Started</a>
+            <a href="{{ url_for('login') }}" class="border-2 border-dark text-dark px-8 py-3 rounded text-lg hover:bg-dark hover:text-khaki transition">Login</a>
+        </div>
+    {% endif %}
+</div>
+
+{% if public_lists %}
+<div class="mt-12">
+    <h2 class="text-sm font-semibold text-dark uppercase tracking-wider mb-4">Popular Lists</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for list in public_lists %}
+        <a href="{{ url_for('view_list', list_id=list.id) }}" class="bg-cardbg rounded-lg p-5 shadow-md hover:shadow-lg transition border-l-4 border-dark">
+            <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
+            <p class="text-sm text-forest mt-1">by {{ list.profiles.username if list.profiles else 'Unknown' }}</p>
+            {% if list.description %}
+                <p class="text-sm text-forest mt-2">{{ list.description[:100] }}{% if list.description|length > 100 %}...{% endif %}</p>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

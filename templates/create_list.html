@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}New List - Jukebox{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto bg-cardbg rounded-lg shadow-lg p-8 border-t-4 border-dark">
+    <h1 class="text-2xl font-bold text-dark mb-6">Create New List</h1>
+
+    <form method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-dark mb-1">Title</label>
+            <input type="text" name="title" required maxlength="100"
+                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
+                   placeholder="My Top 50 Songs of 2024">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-dark mb-1">Description (optional)</label>
+            <textarea name="description" rows="3"
+                      class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
+                      placeholder="What's this list about?"></textarea>
+        </div>
+
+        <div class="flex items-center space-x-6">
+            <label class="flex items-center cursor-pointer">
+                <input type="checkbox" name="is_ranked" checked class="mr-2 accent-dark">
+                <span class="text-sm text-dark">Ranked (numbered 1, 2, 3...)</span>
+            </label>
+        </div>
+
+        <div class="flex items-center space-x-6">
+            <label class="flex items-center cursor-pointer">
+                <input type="checkbox" name="is_public" checked class="mr-2 accent-dark">
+                <span class="text-sm text-dark">Public (visible to everyone)</span>
+            </label>
+        </div>
+
+        <div class="pt-4">
+            <button type="submit" class="w-full bg-dark text-khaki py-2 rounded font-semibold hover:bg-forest transition">
+                Create List
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

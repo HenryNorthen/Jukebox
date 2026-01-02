@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{{ list.title }} - Jukebox{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex justify-between items-start">
+        <div>
+            <h1 class="text-3xl font-bold text-dark">{{ list.title }}</h1>
+            <p class="text-forest mt-1">
+                by <a href="{{ url_for('user_profile', username=list.profiles.username) }}" class="text-dark font-medium hover:underline">{{ list.profiles.username if list.profiles else 'Unknown' }}</a>
+                {% if list.is_ranked %}<span class="text-khaki mx-2">|</span> <span class="text-forest">Ranked</span>{% endif %}
+            </p>
+        </div>
+        {% if is_owner %}
+            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
+                Edit List
+            </a>
+        {% endif %}
+    </div>
+
+    {% if list.description %}
+        <p class="text-forest mt-4 max-w-2xl">{{ list.description }}</p>
+    {% endif %}
+</div>
+
+{% if items %}
+    <div class="album-grid">
+        {% for item in items %}
+        <div class="album-tile group">
+            {% if item.album_art_url %}
+                <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}">
+            {% else %}
+                <div class="w-full h-full bg-khaki flex items-center justify-center">
+                    <span class="text-4xl text-dark">&#9835;</span>
+                </div>
+            {% endif %}
+
+            {% if list.is_ranked %}
+                <div class="rank-badge">{{ item.position }}</div>
+            {% endif %}
+
+            <!-- Hover overlay -->
+            <div class="absolute inset-0 bg-dark bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                <p class="text-khaki font-bold text-sm truncate">{{ item.track_name }}</p>
+                <p class="text-khakilight text-xs truncate">{{ item.artist_name }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
+        <p class="text-xl text-forest">This list is empty</p>
+        {% if is_owner %}
+            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="inline-block mt-4 bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
+                Add songs
+            </a>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

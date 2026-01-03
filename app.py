@@ -1676,7 +1676,7 @@ def get_spotify_playlist_tracks(playlist_id):
 @app.route('/api/spotify/import', methods=['POST'])
 @login_required
 def import_spotify_playlist():
-    """Import a Spotify playlist to Jukebox."""
+    """Import a Spotify playlist to Jukeboxd."""
     sp = get_user_spotify_client(session['user']['id'])
     if not sp:
         return jsonify({'error': 'Spotify not connected'}), 401
@@ -1766,7 +1766,7 @@ def import_spotify_playlist():
 @app.route('/api/spotify/export', methods=['POST'])
 @login_required
 def export_to_spotify():
-    """Export a Jukebox list to Spotify."""
+    """Export a Jukeboxd list to Spotify."""
     sp = get_user_spotify_client(session['user']['id'])
     if not sp:
         return jsonify({'error': 'Spotify not connected'}), 401
@@ -1819,7 +1819,7 @@ def export_to_spotify():
                 spotify_user_id,
                 name,
                 public=False,
-                description=f"Exported from Jukebox: {lst['title']}"
+                description=f"Exported from Jukeboxd: {lst['title']}"
             )
 
             # Add tracks in batches of 100

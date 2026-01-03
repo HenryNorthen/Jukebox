@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit: {{ list.title }} - Jukebox{% endblock %}
+{% block title %}Edit: {{ list.title }} - Jukeboxd{% endblock %}
 
 {% block content %}
 <div class="mb-6">
@@ -446,7 +446,7 @@ function saveSettings() {
     .then(data => {
         if (data.success) {
             document.getElementById('list-title-display').textContent = title;
-            document.title = `Edit: ${title} - Jukebox`;
+            document.title = `Edit: ${title} - Jukeboxd`;
             const status = document.getElementById('settings-status');
             status.classList.remove('hidden');
             setTimeout(() => status.classList.add('hidden'), 2000);

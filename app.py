@@ -528,9 +528,28 @@ def user_profile(username):
     except Exception:
         pass  # Tables might not exist yet
 
+    # Get follower/following counts
+    follower_count = 0
+    following_count = 0
+    is_following = False
+    try:
+        follower_result = supabase.table('followers').select('id', count='exact').eq('following_id', profile['id']).execute()
+        follower_count = follower_result.count if follower_result.count else 0
+
+        following_result = supabase.table('followers').select('id', count='exact').eq('follower_id', profile['id']).execute()
+        following_count = following_result.count if following_result.count else 0
+
+        # Check if current user is following this profile
+        if 'user' in session and session['user']['id'] != profile['id']:
+            follow_check = supabase.table('followers').select('id').eq('follower_id', session['user']['id']).eq('following_id', profile['id']).execute()
+            is_following = bool(follow_check.data)
+    except Exception:
+        pass  # Table might not exist yet
+
     return render_template('profile.html', profile=profile, lists=lists,
                           favorite_songs=favorite_songs, favorite_albums=favorite_albums,
-                          album_ratings=album_ratings, song_ratings=song_ratings, is_owner=is_owner)
+                          album_ratings=album_ratings, song_ratings=song_ratings, is_owner=is_owner,
+                          follower_count=follower_count, following_count=following_count, is_following=is_following)
 
 
 @app.route('/api/spotify/search/albums')
@@ -1145,6 +1164,95 @@ def get_user_song_ratings():
         return jsonify({'ratings': result.data if result.data else []})
     except Exception:
         return jsonify({'ratings': []})
+
+
+# ============== FOLLOW API ==============
+
+@app.route('/api/user/<user_id>/follow', methods=['POST'])
+@login_required
+def follow_user(user_id):
+    """Follow a user."""
+    follower_id = session['user']['id']
+
+    # Can't follow yourself
+    if follower_id == user_id:
+        return jsonify({'error': 'Cannot follow yourself'}), 400
+
+    try:
+        # Check if already following
+        existing = supabase.table('followers').select('id').eq('follower_id', follower_id).eq('following_id', user_id).execute()
+
+        if existing.data:
+            return jsonify({'success': True, 'message': 'Already following'})
+
+        # Add follow
+        supabase.table('followers').insert({
+            'follower_id': follower_id,
+            'following_id': user_id
+        }).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/<user_id>/unfollow', methods=['POST'])
+@login_required
+def unfollow_user(user_id):
+    """Unfollow a user."""
+    follower_id = session['user']['id']
+
+    try:
+        supabase.table('followers').delete().eq('follower_id', follower_id).eq('following_id', user_id).execute()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/<user_id>/followers')
+def get_user_followers(user_id):
+    """Get a user's followers."""
+    try:
+        result = supabase.table('followers').select('follower_id').eq('following_id', user_id).execute()
+
+        if not result.data:
+            return jsonify({'followers': []})
+
+        followers = []
+        for f in result.data:
+            profile = supabase.table('profiles').select('username').eq('id', f['follower_id']).single().execute()
+            if profile.data:
+                followers.append({
+                    'id': f['follower_id'],
+                    'username': profile.data['username']
+                })
+
+        return jsonify({'followers': followers})
+    except Exception as e:
+        return jsonify({'followers': [], 'error': str(e)})
+
+
+@app.route('/api/user/<user_id>/following')
+def get_user_following(user_id):
+    """Get users that a user is following."""
+    try:
+        result = supabase.table('followers').select('following_id').eq('follower_id', user_id).execute()
+
+        if not result.data:
+            return jsonify({'following': []})
+
+        following = []
+        for f in result.data:
+            profile = supabase.table('profiles').select('username').eq('id', f['following_id']).single().execute()
+            if profile.data:
+                following.append({
+                    'id': f['following_id'],
+                    'username': profile.data['username']
+                })
+
+        return jsonify({'following': following})
+    except Exception as e:
+        return jsonify({'following': [], 'error': str(e)})
 
 
 if __name__ == '__main__':

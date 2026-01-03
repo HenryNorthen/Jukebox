@@ -18,11 +18,25 @@
                 <span class="text-white font-semibold">{{ lists|length }}</span>
                 <span class="text-muted">public list{{ 's' if lists|length != 1 else '' }}</span>
             </div>
+            <div>
+                <span id="follower-count" class="text-white font-semibold">{{ follower_count }}</span>
+                <span class="text-muted">follower{{ 's' if follower_count != 1 else '' }}</span>
+            </div>
+            <div>
+                <span class="text-white font-semibold">{{ following_count }}</span>
+                <span class="text-muted">following</span>
+            </div>
         </div>
     </div>
-    {% if is_owner %}
-    <a href="{{ url_for('dashboard') }}" class="btn-secondary text-xs">My Dashboard</a>
-    {% endif %}
+    <div class="flex gap-2">
+        {% if is_owner %}
+        <a href="{{ url_for('dashboard') }}" class="btn-secondary text-xs">My Dashboard</a>
+        {% else %}
+        <button id="follow-btn" onclick="toggleFollow()" class="follow-btn btn-primary text-xs">
+            <span id="follow-text">Follow</span>
+        </button>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Favorite Songs -->
@@ -360,6 +374,17 @@
 .clickable-tile {
     cursor: pointer;
 }
+
+/* Follow button styles */
+.follow-btn.following {
+    background: transparent;
+    border: 1px solid #3a3f47;
+    color: #99aabb;
+}
+.follow-btn.following:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
 </style>
 
 <script>
@@ -368,6 +393,47 @@ let likedListsLoaded = false;
 const isLoggedIn = {{ 'true' if session.user else 'false' }};
 let detailData = null;
 let detailRating = 0;
+let isFollowing = {{ 'true' if is_following else 'false' }};
+
+// Initialize follow button state
+document.addEventListener('DOMContentLoaded', function() {
+    updateFollowButton();
+});
+
+function updateFollowButton() {
+    const btn = document.getElementById('follow-btn');
+    const text = document.getElementById('follow-text');
+    if (!btn) return;
+
+    if (isFollowing) {
+        btn.classList.add('following');
+        text.textContent = 'Following';
+    } else {
+        btn.classList.remove('following');
+        text.textContent = 'Follow';
+    }
+}
+
+function toggleFollow() {
+    if (!isLoggedIn) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const endpoint = isFollowing ? `/api/user/${profileUserId}/unfollow` : `/api/user/${profileUserId}/follow`;
+    fetch(endpoint, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                isFollowing = !isFollowing;
+                updateFollowButton();
+                // Update follower count
+                const countEl = document.getElementById('follower-count');
+                const currentCount = parseInt(countEl.textContent);
+                countEl.textContent = isFollowing ? currentCount + 1 : currentCount - 1;
+            }
+        });
+}
 
 // Ratings tab switching
 function showRatingsTab(type) {

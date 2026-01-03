@@ -4,16 +4,26 @@
 
 {% block content %}
 <!-- Profile Header -->
-<div class="flex items-start gap-6 mb-10">
-    <div class="w-20 h-20 rounded-full bg-elevated flex items-center justify-center text-accent text-3xl font-bold flex-shrink-0">
-        {{ profile.username[0].upper() }}
+<div class="flex flex-col md:flex-row md:items-start gap-4 md:gap-6 mb-8 md:mb-10">
+    <div class="flex items-center gap-4 md:block">
+        <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-elevated flex items-center justify-center text-accent text-2xl md:text-3xl font-bold flex-shrink-0">
+            {{ profile.username[0].upper() }}
+        </div>
+        <div class="md:hidden flex-1">
+            <h1 class="text-xl font-bold text-white">{{ profile.username }}</h1>
+            <div class="flex gap-4 mt-1 text-xs">
+                <span><span class="text-white font-semibold">{{ lists|length }}</span> <span class="text-muted">lists</span></span>
+                <span><span id="follower-count-mobile" class="text-white font-semibold">{{ follower_count }}</span> <span class="text-muted">followers</span></span>
+                <span><span class="text-white font-semibold">{{ following_count }}</span> <span class="text-muted">following</span></span>
+            </div>
+        </div>
     </div>
     <div class="flex-1">
-        <h1 class="text-2xl font-bold text-white">{{ profile.username }}</h1>
+        <h1 class="hidden md:block text-2xl font-bold text-white">{{ profile.username }}</h1>
         {% if profile.bio %}
-        <p class="text-muted mt-2">{{ profile.bio }}</p>
+        <p class="text-muted text-sm md:text-base mt-1 md:mt-2">{{ profile.bio }}</p>
         {% endif %}
-        <div class="flex gap-6 mt-3 text-sm">
+        <div class="hidden md:flex gap-6 mt-3 text-sm">
             <div>
                 <span class="text-white font-semibold">{{ lists|length }}</span>
                 <span class="text-muted">public list{{ 's' if lists|length != 1 else '' }}</span>
@@ -34,9 +44,9 @@
         {% if has_spotify %}
         <a href="https://open.spotify.com/user/{{ spotify_user_id }}" target="_blank" class="btn-spotify text-xs">
             <svg class="w-4 h-4 inline-block mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-            View Spotify
+            Spotify
         </a>
-        <button onclick="openImportSpotifyModal()" class="btn-secondary text-xs">Import Playlist</button>
+        <button onclick="openImportSpotifyModal()" class="btn-secondary text-xs">Import</button>
         <button onclick="openDisconnectSpotifyModal()" class="btn-secondary text-xs text-red-400 hover:text-red-300">Disconnect</button>
         {% else %}
         <a href="{{ url_for('connect_spotify') }}" class="btn-spotify text-xs">
@@ -48,7 +58,7 @@
         {% if has_spotify %}
         <a href="https://open.spotify.com/user/{{ spotify_user_id }}" target="_blank" class="btn-spotify text-xs">
             <svg class="w-4 h-4 inline-block mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-            View Spotify
+            Spotify
         </a>
         {% endif %}
         <button id="follow-btn" onclick="toggleFollow()" class="follow-btn btn-primary text-xs">
@@ -59,38 +69,38 @@
 </div>
 
 <!-- Favorite Songs -->
-<div class="mb-10">
-    <div class="flex justify-between items-center mb-4">
+<div class="mb-8 md:mb-10">
+    <div class="flex justify-between items-center mb-3 md:mb-4">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Favorite Songs</h2>
         {% if is_owner %}
         <button onclick="openEditModal('song')" class="text-accent text-xs hover:underline">Edit</button>
         {% endif %}
     </div>
-    <div class="flex gap-3 flex-wrap">
+    <div class="grid grid-cols-5 gap-2 md:flex md:gap-3 md:flex-wrap">
         {% for song in favorite_songs %}
-        <div class="w-28 group clickable-fav"
+        <div class="md:w-28 group clickable-fav"
              data-type="song"
              data-name="{{ song.name }}"
              data-artist="{{ song.artist_name }}"
              data-art="{{ song.album_art_url }}">
-            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
+            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-1 md:mb-2">
                 {% if song.album_art_url %}
                 <img src="{{ song.album_art_url }}" alt="{{ song.name }}" class="w-full h-full object-cover">
                 {% else %}
-                <div class="w-full h-full flex items-center justify-center text-muted text-2xl">♪</div>
+                <div class="w-full h-full flex items-center justify-center text-muted text-xl md:text-2xl">♪</div>
                 {% endif %}
             </div>
-            <p class="text-xs text-white font-medium truncate">{{ song.name }}</p>
-            <p class="text-xs text-muted truncate">{{ song.artist_name }}</p>
+            <p class="hidden md:block text-xs text-white font-medium truncate">{{ song.name }}</p>
+            <p class="hidden md:block text-xs text-muted truncate">{{ song.artist_name }}</p>
         </div>
         {% endfor %}
         {% for i in range(5 - favorite_songs|length) %}
-        <div class="w-28">
+        <div class="md:w-28">
             <div class="aspect-square rounded-lg bg-elevated/50 border border-dashed border-border flex items-center justify-center">
                 {% if is_owner %}
-                <button onclick="openEditModal('song')" class="text-muted text-2xl hover:text-accent">+</button>
+                <button onclick="openEditModal('song')" class="text-muted text-xl md:text-2xl hover:text-accent">+</button>
                 {% else %}
-                <span class="text-muted/50 text-2xl">♪</span>
+                <span class="text-muted/50 text-xl md:text-2xl">♪</span>
                 {% endif %}
             </div>
         </div>
@@ -99,38 +109,38 @@
 </div>
 
 <!-- Favorite Albums -->
-<div class="mb-10">
-    <div class="flex justify-between items-center mb-4">
+<div class="mb-8 md:mb-10">
+    <div class="flex justify-between items-center mb-3 md:mb-4">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Favorite Albums</h2>
         {% if is_owner %}
         <button onclick="openEditModal('album')" class="text-accent text-xs hover:underline">Edit</button>
         {% endif %}
     </div>
-    <div class="flex gap-3 flex-wrap">
+    <div class="grid grid-cols-5 gap-2 md:flex md:gap-3 md:flex-wrap">
         {% for album in favorite_albums %}
-        <div class="w-28 group clickable-fav"
+        <div class="md:w-28 group clickable-fav"
              data-type="album"
              data-name="{{ album.name }}"
              data-artist="{{ album.artist_name }}"
              data-art="{{ album.album_art_url }}">
-            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
+            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-1 md:mb-2">
                 {% if album.album_art_url %}
                 <img src="{{ album.album_art_url }}" alt="{{ album.name }}" class="w-full h-full object-cover">
                 {% else %}
-                <div class="w-full h-full flex items-center justify-center text-muted text-2xl">♪</div>
+                <div class="w-full h-full flex items-center justify-center text-muted text-xl md:text-2xl">♪</div>
                 {% endif %}
             </div>
-            <p class="text-xs text-white font-medium truncate">{{ album.name }}</p>
-            <p class="text-xs text-muted truncate">{{ album.artist_name }}</p>
+            <p class="hidden md:block text-xs text-white font-medium truncate">{{ album.name }}</p>
+            <p class="hidden md:block text-xs text-muted truncate">{{ album.artist_name }}</p>
         </div>
         {% endfor %}
         {% for i in range(5 - favorite_albums|length) %}
-        <div class="w-28">
+        <div class="md:w-28">
             <div class="aspect-square rounded-lg bg-elevated/50 border border-dashed border-border flex items-center justify-center">
                 {% if is_owner %}
-                <button onclick="openEditModal('album')" class="text-muted text-2xl hover:text-accent">+</button>
+                <button onclick="openEditModal('album')" class="text-muted text-xl md:text-2xl hover:text-accent">+</button>
                 {% else %}
-                <span class="text-muted/50 text-2xl">♪</span>
+                <span class="text-muted/50 text-xl md:text-2xl">♪</span>
                 {% endif %}
             </div>
         </div>
@@ -141,61 +151,119 @@
 <!-- Ratings Section -->
 <div class="mb-10">
     <div class="flex gap-4 border-b border-border mb-4">
-        <button id="tab-album-ratings" onclick="showRatingsTab('album')" class="text-sm font-semibold text-accent pb-3 border-b-2 border-accent">Album Ratings</button>
-        <button id="tab-song-ratings" onclick="showRatingsTab('song')" class="text-sm font-semibold text-muted pb-3 border-b-2 border-transparent hover:text-white">Song Ratings</button>
+        <button id="tab-album-ratings" onclick="showRatingsTab('album')" class="text-sm font-semibold text-accent pb-3 border-b-2 border-accent">Album Ratings{% if album_ratings %} ({{ album_ratings|length }}){% endif %}</button>
+        <button id="tab-song-ratings" onclick="showRatingsTab('song')" class="text-sm font-semibold text-muted pb-3 border-b-2 border-transparent hover:text-white">Song Ratings{% if song_ratings %} ({{ song_ratings|length }}){% endif %}</button>
     </div>
 
     <!-- Album Ratings Grid -->
-    <div id="album-ratings-grid" class="album-grid">
-        {% for rating in album_ratings %}
-        <div class="album-tile group clickable-tile"
-             data-type="album"
-             data-name="{{ rating.album_name }}"
-             data-artist="{{ rating.artist_name }}"
-             data-art="{{ rating.album_art_url }}">
-            {% if rating.album_art_url %}
-            <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
-            {% else %}
-            <div class="w-full h-full bg-elevated flex items-center justify-center">
-                <span class="text-3xl text-muted">♪</span>
+    <div id="album-ratings-grid">
+        <div class="album-grid">
+            {% for rating in album_ratings[:5] %}
+            <div class="album-tile group clickable-tile"
+                 data-type="album"
+                 data-name="{{ rating.album_name }}"
+                 data-artist="{{ rating.artist_name }}"
+                 data-art="{{ rating.album_art_url }}">
+                {% if rating.album_art_url %}
+                <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
+                {% else %}
+                <div class="w-full h-full bg-elevated flex items-center justify-center">
+                    <span class="text-3xl text-muted">♪</span>
+                </div>
+                {% endif %}
+                <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                    <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
+                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                </div>
             </div>
-            {% endif %}
-            <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
-                <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
-            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        {% if album_ratings|length > 5 %}
+        <div id="album-ratings-expanded" class="album-grid hidden mt-4">
+            {% for rating in album_ratings[5:] %}
+            <div class="album-tile group clickable-tile"
+                 data-type="album"
+                 data-name="{{ rating.album_name }}"
+                 data-artist="{{ rating.artist_name }}"
+                 data-art="{{ rating.album_art_url }}">
+                {% if rating.album_art_url %}
+                <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
+                {% else %}
+                <div class="w-full h-full bg-elevated flex items-center justify-center">
+                    <span class="text-3xl text-muted">♪</span>
+                </div>
+                {% endif %}
+                <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                    <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
+                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button id="toggle-album-ratings" onclick="toggleAlbumRatings()" class="mt-4 text-accent text-sm hover:underline">
+            Show all {{ album_ratings|length }} ratings
+        </button>
+        {% endif %}
         {% if not album_ratings %}
-        <p class="text-muted text-sm col-span-full">No album ratings yet</p>
+        <p class="text-muted text-sm">No album ratings yet</p>
         {% endif %}
     </div>
 
     <!-- Song Ratings Grid -->
-    <div id="song-ratings-grid" class="album-grid hidden">
-        {% for rating in song_ratings %}
-        <div class="album-tile group clickable-tile"
-             data-type="song"
-             data-name="{{ rating.track_name }}"
-             data-artist="{{ rating.artist_name }}"
-             data-art="{{ rating.album_art_url }}">
-            {% if rating.album_art_url %}
-            <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
-            {% else %}
-            <div class="w-full h-full bg-elevated flex items-center justify-center">
-                <span class="text-3xl text-muted">♪</span>
+    <div id="song-ratings-grid" class="hidden">
+        <div class="album-grid">
+            {% for rating in song_ratings[:5] %}
+            <div class="album-tile group clickable-tile"
+                 data-type="song"
+                 data-name="{{ rating.track_name }}"
+                 data-artist="{{ rating.artist_name }}"
+                 data-art="{{ rating.album_art_url }}">
+                {% if rating.album_art_url %}
+                <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
+                {% else %}
+                <div class="w-full h-full bg-elevated flex items-center justify-center">
+                    <span class="text-3xl text-muted">♪</span>
+                </div>
+                {% endif %}
+                <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                    <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
+                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                </div>
             </div>
-            {% endif %}
-            <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
-                <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
-            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        {% if song_ratings|length > 5 %}
+        <div id="song-ratings-expanded" class="album-grid hidden mt-4">
+            {% for rating in song_ratings[5:] %}
+            <div class="album-tile group clickable-tile"
+                 data-type="song"
+                 data-name="{{ rating.track_name }}"
+                 data-artist="{{ rating.artist_name }}"
+                 data-art="{{ rating.album_art_url }}">
+                {% if rating.album_art_url %}
+                <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
+                {% else %}
+                <div class="w-full h-full bg-elevated flex items-center justify-center">
+                    <span class="text-3xl text-muted">♪</span>
+                </div>
+                {% endif %}
+                <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                    <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
+                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button id="toggle-song-ratings" onclick="toggleSongRatings()" class="mt-4 text-accent text-sm hover:underline">
+            Show all {{ song_ratings|length }} ratings
+        </button>
+        {% endif %}
         {% if not song_ratings %}
-        <p class="text-muted text-sm col-span-full">No song ratings yet</p>
+        <p class="text-muted text-sm">No song ratings yet</p>
         {% endif %}
     </div>
 </div>
@@ -547,13 +615,58 @@ function toggleFollow() {
             if (data.success) {
                 isFollowing = !isFollowing;
                 updateFollowButton();
-                // Update follower count
+                // Update follower count (desktop + mobile)
                 const countEl = document.getElementById('follower-count');
+                const countElMobile = document.getElementById('follower-count-mobile');
                 const currentCount = parseInt(countEl.textContent);
-                countEl.textContent = isFollowing ? currentCount + 1 : currentCount - 1;
+                const newCount = isFollowing ? currentCount + 1 : currentCount - 1;
+                countEl.textContent = newCount;
+                if (countElMobile) countElMobile.textContent = newCount;
             }
         });
 }
+
+// Toggle album ratings expand/collapse
+let albumRatingsExpanded = false;
+function toggleAlbumRatings() {
+    const expanded = document.getElementById('album-ratings-expanded');
+    const btn = document.getElementById('toggle-album-ratings');
+    if (!expanded || !btn) return;
+
+    albumRatingsExpanded = !albumRatingsExpanded;
+    if (albumRatingsExpanded) {
+        expanded.classList.remove('hidden');
+        btn.textContent = 'Show less';
+    } else {
+        expanded.classList.add('hidden');
+        btn.textContent = btn.dataset.originalText || 'Show all ratings';
+    }
+}
+
+// Toggle song ratings expand/collapse
+let songRatingsExpanded = false;
+function toggleSongRatings() {
+    const expanded = document.getElementById('song-ratings-expanded');
+    const btn = document.getElementById('toggle-song-ratings');
+    if (!expanded || !btn) return;
+
+    songRatingsExpanded = !songRatingsExpanded;
+    if (songRatingsExpanded) {
+        expanded.classList.remove('hidden');
+        btn.textContent = 'Show less';
+    } else {
+        expanded.classList.add('hidden');
+        btn.textContent = btn.dataset.originalText || 'Show all ratings';
+    }
+}
+
+// Store original button text
+document.addEventListener('DOMContentLoaded', function() {
+    const albumBtn = document.getElementById('toggle-album-ratings');
+    const songBtn = document.getElementById('toggle-song-ratings');
+    if (albumBtn) albumBtn.dataset.originalText = albumBtn.textContent;
+    if (songBtn) songBtn.dataset.originalText = songBtn.textContent;
+});
 
 // Ratings tab switching
 function showRatingsTab(type) {

@@ -3,31 +3,335 @@
 {% block title %}{{ profile.username }} - Jukebox{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-3xl font-bold text-dark">{{ profile.username }}</h1>
-    {% if profile.bio %}
-        <p class="text-forest mt-2">{{ profile.bio }}</p>
+<!-- Profile Header -->
+<div class="flex items-start gap-6 mb-10">
+    <div class="w-20 h-20 rounded-full bg-elevated flex items-center justify-center text-accent text-3xl font-bold flex-shrink-0">
+        {{ profile.username[0].upper() }}
+    </div>
+    <div class="flex-1">
+        <h1 class="text-2xl font-bold text-white">{{ profile.username }}</h1>
+        {% if profile.bio %}
+        <p class="text-muted mt-2">{{ profile.bio }}</p>
+        {% endif %}
+        <div class="flex gap-6 mt-3 text-sm">
+            <div>
+                <span class="text-white font-semibold">{{ lists|length }}</span>
+                <span class="text-muted">public list{{ 's' if lists|length != 1 else '' }}</span>
+            </div>
+        </div>
+    </div>
+    {% if is_owner %}
+    <a href="{{ url_for('dashboard') }}" class="btn-secondary text-xs">My Dashboard</a>
     {% endif %}
 </div>
 
-{% if lists %}
-    <h2 class="text-sm font-semibold text-dark uppercase tracking-wider mb-4">Public Lists</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Favorite Songs -->
+<div class="mb-10">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Favorite Songs</h2>
+        {% if is_owner %}
+        <button onclick="openEditModal('song')" class="text-accent text-xs hover:underline">Edit</button>
+        {% endif %}
+    </div>
+    <div class="flex gap-3 flex-wrap">
+        {% for song in favorite_songs %}
+        <div class="w-28 group">
+            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
+                {% if song.album_art_url %}
+                <img src="{{ song.album_art_url }}" alt="{{ song.name }}" class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center text-muted text-2xl">♪</div>
+                {% endif %}
+            </div>
+            <p class="text-xs text-white font-medium truncate">{{ song.name }}</p>
+            <p class="text-xs text-muted truncate">{{ song.artist_name }}</p>
+        </div>
+        {% endfor %}
+        {% for i in range(5 - favorite_songs|length) %}
+        <div class="w-28">
+            <div class="aspect-square rounded-lg bg-elevated/50 border border-dashed border-border flex items-center justify-center">
+                {% if is_owner %}
+                <button onclick="openEditModal('song')" class="text-muted text-2xl hover:text-accent">+</button>
+                {% else %}
+                <span class="text-muted/50 text-2xl">♪</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Favorite Albums -->
+<div class="mb-10">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Favorite Albums</h2>
+        {% if is_owner %}
+        <button onclick="openEditModal('album')" class="text-accent text-xs hover:underline">Edit</button>
+        {% endif %}
+    </div>
+    <div class="flex gap-3 flex-wrap">
+        {% for album in favorite_albums %}
+        <div class="w-28 group">
+            <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
+                {% if album.album_art_url %}
+                <img src="{{ album.album_art_url }}" alt="{{ album.name }}" class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center text-muted text-2xl">♪</div>
+                {% endif %}
+            </div>
+            <p class="text-xs text-white font-medium truncate">{{ album.name }}</p>
+            <p class="text-xs text-muted truncate">{{ album.artist_name }}</p>
+        </div>
+        {% endfor %}
+        {% for i in range(5 - favorite_albums|length) %}
+        <div class="w-28">
+            <div class="aspect-square rounded-lg bg-elevated/50 border border-dashed border-border flex items-center justify-center">
+                {% if is_owner %}
+                <button onclick="openEditModal('album')" class="text-muted text-2xl hover:text-accent">+</button>
+                {% else %}
+                <span class="text-muted/50 text-2xl">♪</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Public Lists -->
+<div>
+    <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-5">Public Lists</h2>
+    {% if lists %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {% for list in lists %}
-        <a href="{{ url_for('view_list', list_id=list.id) }}" class="bg-cardbg rounded-lg p-5 shadow-md hover:shadow-lg transition border-l-4 border-dark">
-            <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
-            {% if list.description %}
-                <p class="text-sm text-forest mt-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+        <a href="{{ url_for('view_list', list_id=list.id) }}" class="card p-5 hover:border-accent transition block">
+            {% if list.preview_images %}
+            <div class="flex gap-1 mb-4">
+                {% for img in list.preview_images[:4] %}
+                <div class="w-12 h-12 rounded overflow-hidden bg-elevated">
+                    <img src="{{ img }}" alt="" class="w-full h-full object-cover">
+                </div>
+                {% endfor %}
+                {% if list.item_count > 4 %}
+                <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                    <span class="text-muted text-xs font-medium">+{{ list.item_count - 4 }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="flex gap-1 mb-4">
+                <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                    <span class="text-muted text-lg">♪</span>
+                </div>
+            </div>
             {% endif %}
-            <p class="text-xs text-forest mt-3 font-medium">
-                {{ 'Ranked' if list.is_ranked else 'Unranked' }} list
+            <h3 class="font-semibold text-white leading-tight">{{ list.title }}</h3>
+            {% if list.description %}
+            <p class="text-sm text-muted mt-2 line-clamp-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+            {% endif %}
+            <p class="text-xs text-muted mt-3">
+                {{ list.item_count }} song{{ 's' if list.item_count != 1 else '' }} · {{ 'Ranked' if list.is_ranked else 'Unranked' }}
             </p>
         </a>
         {% endfor %}
     </div>
-{% else %}
-    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
-        <p class="text-xl text-forest">No public lists yet</p>
+    {% else %}
+    <div class="card text-center py-12 px-6">
+        <p class="text-muted">No public lists yet</p>
     </div>
+    {% endif %}
+</div>
+
+{% if is_owner %}
+<!-- Edit Favorites Modal -->
+<div id="edit-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-lg">Edit <span id="modal-type-label">Favorites</span></h3>
+            <button onclick="closeEditModal()" class="text-muted hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <!-- Search -->
+        <div class="mb-4">
+            <input type="text" id="fav-search-input" class="input-field" placeholder="Search...">
+        </div>
+        <div id="fav-search-results" class="mb-4 max-h-48 overflow-y-auto"></div>
+
+        <!-- Current Favorites -->
+        <div class="flex-1 overflow-y-auto">
+            <p class="text-xs text-muted mb-2">Current favorites (drag to reorder):</p>
+            <div id="current-favorites" class="space-y-2"></div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-border flex justify-end gap-3">
+            <button onclick="closeEditModal()" class="btn-secondary text-sm">Cancel</button>
+            <button onclick="saveFavorites()" class="btn-primary text-sm">Save</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if is_owner %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+let currentType = 'song';
+let currentFavorites = [];
+let searchTimeout;
+
+const modal = document.getElementById('edit-modal');
+const modalTypeLabel = document.getElementById('modal-type-label');
+const searchInput = document.getElementById('fav-search-input');
+const searchResults = document.getElementById('fav-search-results');
+const currentFavoritesEl = document.getElementById('current-favorites');
+
+// Initialize sortable for current favorites
+let sortable = null;
+
+function openEditModal(type) {
+    currentType = type;
+    modalTypeLabel.textContent = type === 'song' ? 'Favorite Songs' : 'Favorite Albums';
+    searchInput.placeholder = type === 'song' ? 'Search for songs...' : 'Search for albums...';
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+
+    // Load current favorites
+    fetch('/api/profile/favorites')
+        .then(res => res.json())
+        .then(data => {
+            currentFavorites = type === 'song' ? [...data.songs] : [...data.albums];
+            renderCurrentFavorites();
+        });
+
+    modal.classList.remove('hidden');
+    searchInput.focus();
+}
+
+function closeEditModal() {
+    modal.classList.add('hidden');
+    currentFavorites = [];
+}
+
+function renderCurrentFavorites() {
+    if (currentFavorites.length === 0) {
+        currentFavoritesEl.innerHTML = '<p class="text-muted text-sm text-center py-4">No favorites yet. Search above to add some!</p>';
+        return;
+    }
+
+    currentFavoritesEl.innerHTML = currentFavorites.map((item, index) => `
+        <div class="flex items-center gap-3 p-2 bg-elevated rounded" data-index="${index}">
+            <div class="cursor-grab text-muted">⋮⋮</div>
+            <img src="${item.album_art_url || ''}" alt="" class="w-10 h-10 rounded object-cover bg-base">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">${item.name}</p>
+                <p class="text-xs text-muted truncate">${item.artist_name}</p>
+            </div>
+            <button onclick="removeFavorite(${index})" class="text-muted hover:text-danger text-sm">×</button>
+        </div>
+    `).join('');
+
+    // Re-init sortable
+    if (sortable) sortable.destroy();
+    sortable = new Sortable(currentFavoritesEl, {
+        animation: 150,
+        ghostClass: 'opacity-50',
+        onEnd: function(evt) {
+            const item = currentFavorites.splice(evt.oldIndex, 1)[0];
+            currentFavorites.splice(evt.newIndex, 0, item);
+        }
+    });
+}
+
+function removeFavorite(index) {
+    currentFavorites.splice(index, 1);
+    renderCurrentFavorites();
+}
+
+function addFavorite(item) {
+    if (currentFavorites.length >= 5) {
+        alert('Maximum 5 favorites allowed');
+        return;
+    }
+
+    // Check if already exists
+    if (currentFavorites.some(f => f.spotify_id === item.id)) {
+        alert('Already in favorites');
+        return;
+    }
+
+    currentFavorites.push({
+        spotify_id: item.id,
+        name: item.name,
+        artist_name: item.artist,
+        album_art_url: item.album_art
+    });
+
+    renderCurrentFavorites();
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+}
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    if (query.length < 2) {
+        searchResults.innerHTML = '';
+        return;
+    }
+
+    searchTimeout = setTimeout(() => {
+        const endpoint = currentType === 'song' ? '/api/spotify/search' : '/api/spotify/search/albums';
+        const key = currentType === 'song' ? 'tracks' : 'albums';
+
+        fetch(`${endpoint}?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                const items = data[key] || [];
+                if (items.length > 0) {
+                    searchResults.innerHTML = items.map(item => `
+                        <div class="flex items-center gap-3 p-2 hover:bg-elevated rounded cursor-pointer" onclick='addFavorite(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+                            <img src="${item.album_art || ''}" alt="" class="w-9 h-9 rounded object-cover bg-elevated">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">${item.name}</p>
+                                <p class="text-xs text-muted truncate">${item.artist}</p>
+                            </div>
+                            <span class="text-accent text-xs">+ Add</span>
+                        </div>
+                    `).join('');
+                } else {
+                    searchResults.innerHTML = '<p class="text-muted text-sm p-2">No results found</p>';
+                }
+            });
+    }, 300);
+});
+
+function saveFavorites() {
+    const items = currentFavorites.map(f => ({
+        spotify_id: f.spotify_id,
+        name: f.name,
+        artist_name: f.artist_name,
+        album_art_url: f.album_art_url
+    }));
+
+    fetch(`/api/profile/favorites/${currentType}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Failed to save favorites');
+        }
+    });
+}
+
+// Close modal on backdrop click
+modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeEditModal();
+});
+</script>
 {% endif %}
 {% endblock %}

@@ -36,13 +36,17 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    """Landing page - show public lists or redirect to dashboard."""
-    if 'user' in session:
-        return redirect(url_for('dashboard'))
-
-    # Get some public lists to display
-    result = supabase.table('lists').select('*, profiles(username)').eq('is_public', True).limit(10).execute()
+    """Landing page - show popular public lists and user search."""
+    # Get popular public lists (most recent for now)
+    result = supabase.table('lists').select('*, profiles(username)').eq('is_public', True).order('created_at', desc=True).limit(12).execute()
     public_lists = result.data if result.data else []
+
+    # Get item counts and preview images for each list
+    for lst in public_lists:
+        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
+        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
+        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
+        lst['item_count'] = count_result.count if count_result.count else 0
 
     return render_template('index.html', public_lists=public_lists)
 
@@ -469,11 +473,111 @@ def user_profile(username):
 
     profile = profile_result.data
 
+    # Check if current user is viewing their own profile
+    is_owner = 'user' in session and session['user']['id'] == profile['id']
+
     # Get their public lists
     lists_result = supabase.table('lists').select('*').eq('user_id', profile['id']).eq('is_public', True).order('created_at', desc=True).execute()
     lists = lists_result.data if lists_result.data else []
 
-    return render_template('profile.html', profile=profile, lists=lists)
+    # Get item counts and preview images for each list
+    for lst in lists:
+        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
+        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
+        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
+        lst['item_count'] = count_result.count if count_result.count else 0
+
+    # Get favorite songs
+    fav_songs_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'song').order('position').limit(5).execute()
+    favorite_songs = fav_songs_result.data if fav_songs_result.data else []
+
+    # Get favorite albums
+    fav_albums_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'album').order('position').limit(5).execute()
+    favorite_albums = fav_albums_result.data if fav_albums_result.data else []
+
+    return render_template('profile.html', profile=profile, lists=lists,
+                          favorite_songs=favorite_songs, favorite_albums=favorite_albums, is_owner=is_owner)
+
+
+@app.route('/api/spotify/search/albums')
+@login_required
+def spotify_search_albums():
+    """Search Spotify for albums."""
+    query = request.args.get('q', '')
+    if not query or len(query) < 2:
+        return jsonify({'albums': []})
+
+    try:
+        results = spotify.search(q=query, type='album', limit=10)
+        albums = []
+        for item in results['albums']['items']:
+            albums.append({
+                'id': item['id'],
+                'name': item['name'],
+                'artist': ', '.join(a['name'] for a in item['artists']),
+                'album_art': item['images'][0]['url'] if item['images'] else None,
+                'year': item['release_date'][:4] if item.get('release_date') else ''
+            })
+        return jsonify({'albums': albums})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/profile/favorites', methods=['GET'])
+@login_required
+def get_favorites():
+    """Get current user's favorites."""
+    user_id = session['user']['id']
+
+    songs = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'song').order('position').execute()
+    albums = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'album').order('position').execute()
+
+    return jsonify({
+        'songs': songs.data if songs.data else [],
+        'albums': albums.data if albums.data else []
+    })
+
+
+@app.route('/api/profile/favorites/<favorite_type>', methods=['POST'])
+@login_required
+def save_favorites(favorite_type):
+    """Save favorites (songs or albums) for current user."""
+    if favorite_type not in ['song', 'album']:
+        return jsonify({'error': 'Invalid type'}), 400
+
+    user_id = session['user']['id']
+    data = request.json
+    items = data.get('items', [])
+
+    # Delete existing favorites of this type
+    supabase.table('profile_favorites').delete().eq('user_id', user_id).eq('favorite_type', favorite_type).execute()
+
+    # Insert new favorites
+    for i, item in enumerate(items[:5]):  # Max 5
+        supabase.table('profile_favorites').insert({
+            'user_id': user_id,
+            'favorite_type': favorite_type,
+            'position': i + 1,
+            'spotify_id': item.get('spotify_id'),
+            'name': item.get('name'),
+            'artist_name': item.get('artist_name'),
+            'album_art_url': item.get('album_art_url')
+        }).execute()
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/profile/favorites/<favorite_type>/<int:position>', methods=['DELETE'])
+@login_required
+def remove_favorite(favorite_type, position):
+    """Remove a favorite by position."""
+    if favorite_type not in ['song', 'album']:
+        return jsonify({'error': 'Invalid type'}), 400
+
+    user_id = session['user']['id']
+    supabase.table('profile_favorites').delete().eq('user_id', user_id).eq('favorite_type', favorite_type).eq('position', position).execute()
+
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

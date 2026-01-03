@@ -25,11 +25,11 @@
 </div>
 
 {% if items %}
-    <div class="album-grid">
+    <div id="album-grid" class="album-grid">
         {% for item in items %}
-        <div class="album-tile group">
+        <div class="album-tile group {% if is_owner %}cursor-grab active:cursor-grabbing{% endif %}" data-id="{{ item.id }}">
             {% if item.album_art_url %}
-                <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}">
+                <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}" draggable="false">
             {% else %}
                 <div class="w-full h-full bg-khaki flex items-center justify-center">
                     <span class="text-4xl text-dark">&#9835;</span>
@@ -57,5 +57,44 @@
             </a>
         {% endif %}
     </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if is_owner and items %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+const listId = "{{ list.id }}";
+
+const albumGrid = document.getElementById('album-grid');
+new Sortable(albumGrid, {
+    animation: 150,
+    ghostClass: 'opacity-50',
+    onEnd: function(evt) {
+        // Update rank badges if this is a ranked list
+        updateRankBadges();
+
+        // Get new order and save to server
+        const items = albumGrid.querySelectorAll('.album-tile');
+        const order = Array.from(items).map((item, index) => ({
+            item_id: item.dataset.id,
+            position: index + 1
+        }));
+
+        fetch(`/api/list/${listId}/reorder-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order })
+        });
+    }
+});
+
+function updateRankBadges() {
+    const badges = albumGrid.querySelectorAll('.rank-badge');
+    badges.forEach((badge, index) => {
+        badge.textContent = index + 1;
+    });
+}
+</script>
 {% endif %}
 {% endblock %}

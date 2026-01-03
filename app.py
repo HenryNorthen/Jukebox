@@ -815,13 +815,6 @@ def upload_profile_picture():
     if file.content_type not in allowed_types:
         return jsonify({'error': 'Invalid file type. Use JPG, PNG, or WebP'}), 400
 
-    # Validate file size (2MB max)
-    file.seek(0, 2)
-    size = file.tell()
-    file.seek(0)
-    if size > 2 * 1024 * 1024:
-        return jsonify({'error': 'File too large. Max 2MB'}), 400
-
     user_id = session['user']['id']
 
     try:

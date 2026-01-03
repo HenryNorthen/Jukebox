@@ -498,7 +498,7 @@
                 <input type="file" id="picture-input" accept="image/jpeg,image/png,image/webp"
                        class="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-accent file:text-base hover:file:bg-accent/80 file:cursor-pointer cursor-pointer"
                        onchange="previewProfilePicture(this)">
-                <p class="text-xs text-muted mt-1">JPG, PNG or WebP. Max 2MB.</p>
+                <p class="text-xs text-muted mt-1">JPG, PNG or WebP.</p>
             </div>
         </div>
 
@@ -1186,13 +1186,6 @@ function closeProfilePictureModal() {
 function previewProfilePicture(input) {
     const file = input.files[0];
     if (!file) return;
-
-    // Validate file size (2MB max)
-    if (file.size > 2 * 1024 * 1024) {
-        alert('Image must be less than 2MB');
-        input.value = '';
-        return;
-    }
 
     // Validate file type
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {

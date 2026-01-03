@@ -487,13 +487,17 @@ def user_profile(username):
         count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
         lst['item_count'] = count_result.count if count_result.count else 0
 
-    # Get favorite songs
-    fav_songs_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'song').order('position').limit(5).execute()
-    favorite_songs = fav_songs_result.data if fav_songs_result.data else []
+    # Get favorite songs and albums (with error handling if table doesn't exist)
+    favorite_songs = []
+    favorite_albums = []
+    try:
+        fav_songs_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'song').order('position').limit(5).execute()
+        favorite_songs = fav_songs_result.data if fav_songs_result.data else []
 
-    # Get favorite albums
-    fav_albums_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'album').order('position').limit(5).execute()
-    favorite_albums = fav_albums_result.data if fav_albums_result.data else []
+        fav_albums_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'album').order('position').limit(5).execute()
+        favorite_albums = fav_albums_result.data if fav_albums_result.data else []
+    except Exception:
+        pass  # Table might not exist yet
 
     return render_template('profile.html', profile=profile, lists=lists,
                           favorite_songs=favorite_songs, favorite_albums=favorite_albums, is_owner=is_owner)
@@ -529,13 +533,16 @@ def get_favorites():
     """Get current user's favorites."""
     user_id = session['user']['id']
 
-    songs = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'song').order('position').execute()
-    albums = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'album').order('position').execute()
+    try:
+        songs = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'song').order('position').execute()
+        albums = supabase.table('profile_favorites').select('*').eq('user_id', user_id).eq('favorite_type', 'album').order('position').execute()
 
-    return jsonify({
-        'songs': songs.data if songs.data else [],
-        'albums': albums.data if albums.data else []
-    })
+        return jsonify({
+            'songs': songs.data if songs.data else [],
+            'albums': albums.data if albums.data else []
+        })
+    except Exception:
+        return jsonify({'songs': [], 'albums': [], 'error': 'Favorites table not set up yet'})
 
 
 @app.route('/api/profile/favorites/<favorite_type>', methods=['POST'])
@@ -549,22 +556,25 @@ def save_favorites(favorite_type):
     data = request.json
     items = data.get('items', [])
 
-    # Delete existing favorites of this type
-    supabase.table('profile_favorites').delete().eq('user_id', user_id).eq('favorite_type', favorite_type).execute()
+    try:
+        # Delete existing favorites of this type
+        supabase.table('profile_favorites').delete().eq('user_id', user_id).eq('favorite_type', favorite_type).execute()
 
-    # Insert new favorites
-    for i, item in enumerate(items[:5]):  # Max 5
-        supabase.table('profile_favorites').insert({
-            'user_id': user_id,
-            'favorite_type': favorite_type,
-            'position': i + 1,
-            'spotify_id': item.get('spotify_id'),
-            'name': item.get('name'),
-            'artist_name': item.get('artist_name'),
-            'album_art_url': item.get('album_art_url')
-        }).execute()
+        # Insert new favorites
+        for i, item in enumerate(items[:5]):  # Max 5
+            supabase.table('profile_favorites').insert({
+                'user_id': user_id,
+                'favorite_type': favorite_type,
+                'position': i + 1,
+                'spotify_id': item.get('spotify_id'),
+                'name': item.get('name'),
+                'artist_name': item.get('artist_name'),
+                'album_art_url': item.get('album_art_url')
+            }).execute()
 
-    return jsonify({'success': True})
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Favorites table not set up. Please create the profile_favorites table in Supabase.'}), 500
 
 
 @app.route('/api/profile/favorites/<favorite_type>/<int:position>', methods=['DELETE'])

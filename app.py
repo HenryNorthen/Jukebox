@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-from functools import wraps
+from functools import wraps, lru_cache
 from supabase import create_client, Client
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
@@ -8,6 +8,7 @@ from config import Config
 import urllib.parse
 import requests
 import base64
+import time
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -26,6 +27,36 @@ spotify = spotipy.Spotify(
 
 # Spotify OAuth scopes
 SPOTIFY_SCOPES = 'playlist-read-private playlist-modify-public playlist-modify-private user-read-private'
+
+# Simple timed cache for Spotify searches (reduces API calls)
+_spotify_cache = {}
+_CACHE_TTL = 300  # 5 minutes
+
+
+def cached_spotify_search(query, search_type, limit=10):
+    """Cache Spotify search results for 5 minutes."""
+    cache_key = f"{search_type}:{query}:{limit}"
+    now = time.time()
+
+    # Check cache
+    if cache_key in _spotify_cache:
+        cached_time, cached_result = _spotify_cache[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            return cached_result
+
+    # Perform search
+    result = spotify.search(q=query, type=search_type, limit=limit)
+
+    # Cache result
+    _spotify_cache[cache_key] = (now, result)
+
+    # Clean old entries (simple cleanup - keep cache from growing too large)
+    if len(_spotify_cache) > 100:
+        expired_keys = [k for k, (t, _) in _spotify_cache.items() if now - t > _CACHE_TTL]
+        for k in expired_keys:
+            del _spotify_cache[k]
+
+    return result
 
 
 def get_spotify_auth_url():
@@ -141,6 +172,56 @@ def login_required(f):
     return decorated_function
 
 
+def enrich_lists_with_metadata(lists):
+    """Batch fetch metadata (preview images, item counts, like counts) for multiple lists.
+
+    This eliminates N+1 queries by fetching all data in bulk.
+    """
+    if not lists:
+        return lists
+
+    list_ids = [lst['id'] for lst in lists]
+
+    # Batch fetch all list items for preview images (get first 4 per list)
+    all_items = supabase.table('list_items').select('list_id, album_art_url, position').in_('list_id', list_ids).order('position').execute()
+
+    # Batch fetch all like counts
+    try:
+        all_likes = supabase.table('list_likes').select('list_id').in_('list_id', list_ids).execute()
+    except Exception:
+        all_likes = type('obj', (object,), {'data': []})()
+
+    # Build lookup dictionaries
+    items_by_list = {}
+    for item in (all_items.data or []):
+        lid = item['list_id']
+        if lid not in items_by_list:
+            items_by_list[lid] = []
+        if len(items_by_list[lid]) < 4 and item.get('album_art_url'):
+            items_by_list[lid].append(item['album_art_url'])
+
+    # Count items per list
+    item_counts = {}
+    for item in (all_items.data or []):
+        lid = item['list_id']
+        item_counts[lid] = item_counts.get(lid, 0) + 1
+
+    # Count likes per list
+    like_counts = {}
+    for like in (all_likes.data or []):
+        lid = like['list_id']
+        like_counts[lid] = like_counts.get(lid, 0) + 1
+
+    # Enrich each list
+    for lst in lists:
+        lid = lst['id']
+        lst['preview_images'] = items_by_list.get(lid, [])
+        lst['item_count'] = item_counts.get(lid, 0)
+        lst['like_count'] = like_counts.get(lid, 0)
+
+    return lists
+
+
 # ============== AUTH ROUTES ==============
 
 @app.route('/')
@@ -150,18 +231,8 @@ def index():
     result = supabase.table('lists').select('*, profiles(username)').eq('is_public', True).order('created_at', desc=True).limit(12).execute()
     public_lists = result.data if result.data else []
 
-    # Get item counts, preview images, and like counts for each list
-    for lst in public_lists:
-        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
-        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
-        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
-        lst['item_count'] = count_result.count if count_result.count else 0
-        # Get like count
-        try:
-            like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', lst['id']).execute()
-            lst['like_count'] = like_result.count if like_result.count else 0
-        except Exception:
-            lst['like_count'] = 0
+    # Batch fetch metadata for all lists (eliminates N+1 queries)
+    enrich_lists_with_metadata(public_lists)
 
     return render_template('index.html', public_lists=public_lists)
 
@@ -251,15 +322,8 @@ def dashboard():
     result = supabase.table('lists').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
     my_lists = result.data if result.data else []
 
-    # Get item counts and preview images for each list
-    for lst in my_lists:
-        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
-        lst['item_count'] = len(items_result.data) if items_result.data else 0
-        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
-
-        # Get total count
-        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
-        lst['item_count'] = count_result.count if count_result.count else 0
+    # Batch fetch metadata for all lists (eliminates N+1 queries)
+    enrich_lists_with_metadata(my_lists)
 
     return render_template('dashboard.html', lists=my_lists)
 
@@ -349,7 +413,7 @@ def spotify_search():
         return jsonify({'tracks': []})
 
     try:
-        results = spotify.search(q=query, type='track', limit=10)
+        results = cached_spotify_search(query, 'track', 10)
         tracks = []
         for item in results['tracks']['items']:
             tracks.append({
@@ -507,19 +571,19 @@ def duplicate_list(list_id):
 
     new_list_id = new_list.data[0]['id']
 
-    # Copy all items
+    # Copy all items using batch insert
     items_result = supabase.table('list_items').select('*').eq('list_id', list_id).order('position').execute()
     if items_result.data:
-        for item in items_result.data:
-            supabase.table('list_items').insert({
-                'list_id': new_list_id,
-                'position': item['position'],
-                'spotify_track_id': item['spotify_track_id'],
-                'track_name': item['track_name'],
-                'artist_name': item['artist_name'],
-                'album_name': item['album_name'],
-                'album_art_url': item['album_art_url']
-            }).execute()
+        new_items = [{
+            'list_id': new_list_id,
+            'position': item['position'],
+            'spotify_track_id': item['spotify_track_id'],
+            'track_name': item['track_name'],
+            'artist_name': item['artist_name'],
+            'album_name': item['album_name'],
+            'album_art_url': item['album_art_url']
+        } for item in items_result.data]
+        supabase.table('list_items').insert(new_items).execute()
 
     return jsonify({'success': True, 'new_list_id': new_list_id})
 
@@ -573,10 +637,19 @@ def search_users():
         result = supabase.table('profiles').select('*').ilike('username', f'%{query}%').limit(20).execute()
         users = result.data if result.data else []
 
-        # Get public list count for each user
-        for user in users:
-            count_result = supabase.table('lists').select('id', count='exact').eq('user_id', user['id']).eq('is_public', True).execute()
-            user['list_count'] = count_result.count if count_result.count else 0
+        if users:
+            # Batch fetch public list counts for all users
+            user_ids = [u['id'] for u in users]
+            lists_result = supabase.table('lists').select('user_id').in_('user_id', user_ids).eq('is_public', True).execute()
+
+            # Count lists per user
+            list_counts = {}
+            for lst in (lists_result.data or []):
+                uid = lst['user_id']
+                list_counts[uid] = list_counts.get(uid, 0) + 1
+
+            for user in users:
+                user['list_count'] = list_counts.get(user['id'], 0)
 
     return render_template('search_users.html', users=users, query=query)
 
@@ -600,18 +673,8 @@ def user_profile(username):
     lists_result = supabase.table('lists').select('*').eq('user_id', profile['id']).eq('is_public', True).order('created_at', desc=True).execute()
     lists = lists_result.data if lists_result.data else []
 
-    # Get item counts, preview images, and like counts for each list
-    for lst in lists:
-        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
-        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
-        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
-        lst['item_count'] = count_result.count if count_result.count else 0
-        # Get like count
-        try:
-            like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', lst['id']).execute()
-            lst['like_count'] = like_result.count if like_result.count else 0
-        except Exception:
-            lst['like_count'] = 0
+    # Batch fetch metadata for all lists (eliminates N+1 queries)
+    enrich_lists_with_metadata(lists)
 
     # Get favorite songs and albums (with error handling if table doesn't exist)
     favorite_songs = []
@@ -685,7 +748,7 @@ def spotify_search_albums():
         return jsonify({'albums': []})
 
     try:
-        results = spotify.search(q=query, type='album', limit=10)
+        results = cached_spotify_search(query, 'album', 10)
         albums = []
         for item in results['albums']['items']:
             albums.append({
@@ -733,9 +796,9 @@ def save_favorites(favorite_type):
         # Delete existing favorites of this type
         supabase.table('profile_favorites').delete().eq('user_id', user_id).eq('favorite_type', favorite_type).execute()
 
-        # Insert new favorites
-        for i, item in enumerate(items[:5]):  # Max 5
-            supabase.table('profile_favorites').insert({
+        # Insert new favorites using batch insert
+        if items[:5]:
+            new_favorites = [{
                 'user_id': user_id,
                 'favorite_type': favorite_type,
                 'position': i + 1,
@@ -743,7 +806,8 @@ def save_favorites(favorite_type):
                 'name': item.get('name'),
                 'artist_name': item.get('artist_name'),
                 'album_art_url': item.get('album_art_url')
-            }).execute()
+            } for i, item in enumerate(items[:5])]
+            supabase.table('profile_favorites').insert(new_favorites).execute()
 
         return jsonify({'success': True})
     except Exception as e:
@@ -774,12 +838,24 @@ def get_user_lists():
     result = supabase.table('lists').select('id, title').eq('user_id', user_id).order('created_at', desc=True).execute()
     lists = result.data if result.data else []
 
-    # Get item counts and first image for each list
-    for lst in lists:
-        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(1).execute()
-        lst['preview_image'] = items_result.data[0]['album_art_url'] if items_result.data else None
-        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
-        lst['item_count'] = count_result.count if count_result.count else 0
+    if lists:
+        # Batch fetch all list items for preview images and counts
+        list_ids = [lst['id'] for lst in lists]
+        all_items = supabase.table('list_items').select('list_id, album_art_url, position').in_('list_id', list_ids).order('position').execute()
+
+        # Build lookup dictionaries
+        first_images = {}
+        item_counts = {}
+        for item in (all_items.data or []):
+            lid = item['list_id']
+            item_counts[lid] = item_counts.get(lid, 0) + 1
+            if lid not in first_images and item.get('album_art_url'):
+                first_images[lid] = item['album_art_url']
+
+        for lst in lists:
+            lid = lst['id']
+            lst['preview_image'] = first_images.get(lid)
+            lst['item_count'] = item_counts.get(lid, 0)
 
     return jsonify({'lists': lists})
 
@@ -963,44 +1039,42 @@ def unified_search():
     results = {'profiles': [], 'lists': [], 'songs': [], 'albums': []}
 
     try:
-        # Search profiles
+        # Search profiles with batch list count fetch
         profiles_result = supabase.table('profiles').select('*').ilike('username', f'%{query}%').limit(5).execute()
         if profiles_result.data:
+            user_ids = [p['id'] for p in profiles_result.data]
+            lists_for_users = supabase.table('lists').select('user_id').in_('user_id', user_ids).eq('is_public', True).execute()
+
+            list_counts = {}
+            for lst in (lists_for_users.data or []):
+                uid = lst['user_id']
+                list_counts[uid] = list_counts.get(uid, 0) + 1
+
             for p in profiles_result.data:
-                count_result = supabase.table('lists').select('id', count='exact').eq('user_id', p['id']).eq('is_public', True).execute()
                 results['profiles'].append({
                     'username': p['username'],
-                    'list_count': count_result.count if count_result.count else 0
+                    'list_count': list_counts.get(p['id'], 0)
                 })
 
-        # Search lists (public only)
+        # Search lists (public only) with batch metadata fetch
         lists_result = supabase.table('lists').select('*, profiles(username)').ilike('title', f'%{query}%').eq('is_public', True).limit(5).execute()
         if lists_result.data:
+            # Use helper to batch fetch metadata
+            enrich_lists_with_metadata(lists_result.data)
+
             for l in lists_result.data:
-                # Get preview image
-                items_result = supabase.table('list_items').select('album_art_url').eq('list_id', l['id']).order('position').limit(1).execute()
-                preview_image = items_result.data[0]['album_art_url'] if items_result.data else None
-                # Get item count
-                count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', l['id']).execute()
-                # Get like count
-                like_count = 0
-                try:
-                    like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', l['id']).execute()
-                    like_count = like_result.count if like_result.count else 0
-                except Exception:
-                    pass
                 results['lists'].append({
                     'id': l['id'],
                     'title': l['title'],
                     'username': l['profiles']['username'] if l.get('profiles') else 'Unknown',
-                    'preview_image': preview_image,
-                    'item_count': count_result.count if count_result.count else 0,
-                    'like_count': like_count
+                    'preview_image': l['preview_images'][0] if l.get('preview_images') else None,
+                    'item_count': l.get('item_count', 0),
+                    'like_count': l.get('like_count', 0)
                 })
 
-        # Search songs via Spotify
+        # Search songs via Spotify (cached)
         try:
-            spotify_results = spotify.search(q=query, type='track', limit=5)
+            spotify_results = cached_spotify_search(query, 'track', 5)
             for item in spotify_results['tracks']['items']:
                 results['songs'].append({
                     'id': item['id'],
@@ -1012,9 +1086,9 @@ def unified_search():
         except Exception:
             pass
 
-        # Search albums via Spotify
+        # Search albums via Spotify (cached)
         try:
-            album_results = spotify.search(q=query, type='album', limit=5)
+            album_results = cached_spotify_search(query, 'album', 5)
             for item in album_results['albums']['items']:
                 results['albums'].append({
                     'id': item['id'],
@@ -1078,36 +1152,26 @@ def item_details():
             list_items = supabase.table('list_items').select('list_id').eq('album_name', name).eq('artist_name', artist).execute()
 
         if list_items.data:
-            list_ids = list(set([item['list_id'] for item in list_items.data]))
-            lists_with_likes = []
+            list_ids = list(set([item['list_id'] for item in list_items.data]))[:20]  # Limit to 20
 
-            for list_id in list_ids[:20]:  # Limit to 20 lists
-                list_data = supabase.table('lists').select('*, profiles(username)').eq('id', list_id).eq('is_public', True).single().execute()
-                if list_data.data:
-                    # Get like count
-                    like_count = 0
-                    try:
-                        like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', list_id).execute()
-                        like_count = like_result.count if like_result.count else 0
-                    except Exception:
-                        pass
+            # Batch fetch all lists with their profiles
+            lists_result = supabase.table('lists').select('*, profiles(username)').in_('id', list_ids).eq('is_public', True).execute()
 
-                    # Get preview image and item count
-                    items_result = supabase.table('list_items').select('album_art_url').eq('list_id', list_id).order('position').limit(1).execute()
-                    preview_image = items_result.data[0]['album_art_url'] if items_result.data else None
-                    count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', list_id).execute()
+            if lists_result.data:
+                # Use helper to batch fetch metadata
+                enrich_lists_with_metadata(lists_result.data)
 
-                    lists_with_likes.append({
-                        'id': list_id,
-                        'title': list_data.data['title'],
-                        'username': list_data.data['profiles']['username'] if list_data.data.get('profiles') else 'Unknown',
-                        'preview_image': preview_image,
-                        'item_count': count_result.count if count_result.count else 0,
-                        'like_count': like_count
-                    })
+                lists_with_likes = [{
+                    'id': lst['id'],
+                    'title': lst['title'],
+                    'username': lst['profiles']['username'] if lst.get('profiles') else 'Unknown',
+                    'preview_image': lst['preview_images'][0] if lst.get('preview_images') else None,
+                    'item_count': lst.get('item_count', 0),
+                    'like_count': lst.get('like_count', 0)
+                } for lst in lists_result.data]
 
-            # Sort by like count descending
-            result['lists'] = sorted(lists_with_likes, key=lambda x: x['like_count'], reverse=True)
+                # Sort by like count descending
+                result['lists'] = sorted(lists_with_likes, key=lambda x: x['like_count'], reverse=True)
 
     except Exception as e:
         print(f"Item details error: {e}")
@@ -1187,27 +1251,33 @@ def get_user_liked_lists(user_id):
         if not likes_result.data:
             return jsonify({'lists': []})
 
+        list_ids = [like['list_id'] for like in likes_result.data]
+
+        # Batch fetch all lists with their profiles
+        lists_result = supabase.table('lists').select('*, profiles(username)').in_('id', list_ids).eq('is_public', True).execute()
+
+        if not lists_result.data:
+            return jsonify({'lists': []})
+
+        # Use helper to batch fetch metadata
+        enrich_lists_with_metadata(lists_result.data)
+
+        # Build result preserving order from likes
+        lists_by_id = {lst['id']: lst for lst in lists_result.data}
         lists = []
         for like in likes_result.data:
-            list_data = supabase.table('lists').select('*, profiles(username)').eq('id', like['list_id']).eq('is_public', True).single().execute()
-            if list_data.data:
-                # Get preview and count
-                items_result = supabase.table('list_items').select('album_art_url').eq('list_id', like['list_id']).order('position').limit(4).execute()
-                preview_images = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
-                count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', like['list_id']).execute()
-
-                # Get like count
-                like_count_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', like['list_id']).execute()
-
+            lid = like['list_id']
+            if lid in lists_by_id:
+                lst = lists_by_id[lid]
                 lists.append({
-                    'id': like['list_id'],
-                    'title': list_data.data['title'],
-                    'description': list_data.data.get('description'),
-                    'is_ranked': list_data.data['is_ranked'],
-                    'username': list_data.data['profiles']['username'] if list_data.data.get('profiles') else 'Unknown',
-                    'preview_images': preview_images,
-                    'item_count': count_result.count if count_result.count else 0,
-                    'like_count': like_count_result.count if like_count_result.count else 0
+                    'id': lid,
+                    'title': lst['title'],
+                    'description': lst.get('description'),
+                    'is_ranked': lst['is_ranked'],
+                    'username': lst['profiles']['username'] if lst.get('profiles') else 'Unknown',
+                    'preview_images': lst.get('preview_images', []),
+                    'item_count': lst.get('item_count', 0),
+                    'like_count': lst.get('like_count', 0)
                 })
 
         return jsonify({'lists': lists})
@@ -1342,14 +1412,14 @@ def get_user_followers(user_id):
         if not result.data:
             return jsonify({'followers': []})
 
-        followers = []
-        for f in result.data:
-            profile = supabase.table('profiles').select('username').eq('id', f['follower_id']).single().execute()
-            if profile.data:
-                followers.append({
-                    'id': f['follower_id'],
-                    'username': profile.data['username']
-                })
+        # Batch fetch all profiles
+        follower_ids = [f['follower_id'] for f in result.data]
+        profiles_result = supabase.table('profiles').select('id, username').in_('id', follower_ids).execute()
+
+        # Build lookup and result
+        profiles_by_id = {p['id']: p['username'] for p in (profiles_result.data or [])}
+        followers = [{'id': fid, 'username': profiles_by_id.get(fid, 'Unknown')}
+                     for fid in follower_ids if fid in profiles_by_id]
 
         return jsonify({'followers': followers})
     except Exception as e:
@@ -1365,14 +1435,14 @@ def get_user_following(user_id):
         if not result.data:
             return jsonify({'following': []})
 
-        following = []
-        for f in result.data:
-            profile = supabase.table('profiles').select('username').eq('id', f['following_id']).single().execute()
-            if profile.data:
-                following.append({
-                    'id': f['following_id'],
-                    'username': profile.data['username']
-                })
+        # Batch fetch all profiles
+        following_ids = [f['following_id'] for f in result.data]
+        profiles_result = supabase.table('profiles').select('id, username').in_('id', following_ids).execute()
+
+        # Build lookup and result
+        profiles_by_id = {p['id']: p['username'] for p in (profiles_result.data or [])}
+        following = [{'id': fid, 'username': profiles_by_id.get(fid, 'Unknown')}
+                     for fid in following_ids if fid in profiles_by_id]
 
         return jsonify({'following': following})
     except Exception as e:
@@ -1586,13 +1656,14 @@ def import_spotify_playlist():
             pos_result = supabase.table('list_items').select('position').eq('list_id', target_list_id).order('position', desc=True).limit(1).execute()
             next_position = (pos_result.data[0]['position'] + 1) if pos_result.data else 1
 
-            # Add tracks
-            for i, track in enumerate(tracks):
-                supabase.table('list_items').insert({
+            # Add tracks using batch insert
+            if tracks:
+                new_items = [{
                     'list_id': target_list_id,
                     'position': next_position + i,
                     **track
-                }).execute()
+                } for i, track in enumerate(tracks)]
+                supabase.table('list_items').insert(new_items).execute()
 
             return jsonify({'success': True, 'list_id': target_list_id, 'tracks_added': len(tracks)})
         else:
@@ -1611,13 +1682,14 @@ def import_spotify_playlist():
 
             new_list_id = list_result.data[0]['id']
 
-            # Add tracks
-            for i, track in enumerate(tracks):
-                supabase.table('list_items').insert({
+            # Add tracks using batch insert
+            if tracks:
+                new_items = [{
                     'list_id': new_list_id,
                     'position': i + 1,
                     **track
-                }).execute()
+                } for i, track in enumerate(tracks)]
+                supabase.table('list_items').insert(new_items).execute()
 
             return jsonify({'success': True, 'list_id': new_list_id, 'tracks_added': len(tracks)})
 

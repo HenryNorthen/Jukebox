@@ -276,16 +276,19 @@ def update_list_item(list_id, item_id):
 
     data = request.json
 
-    # Update the item
-    supabase.table('list_items').update({
-        'spotify_track_id': data.get('track_id'),
-        'track_name': data.get('track_name'),
-        'artist_name': data.get('artist_name'),
-        'album_name': data.get('album_name'),
-        'album_art_url': data.get('album_art_url')
-    }).eq('id', item_id).execute()
+    # Update the item - filter by both id and list_id for safety
+    try:
+        result = supabase.table('list_items').update({
+            'spotify_track_id': data.get('track_id'),
+            'track_name': data.get('track_name'),
+            'artist_name': data.get('artist_name'),
+            'album_name': data.get('album_name'),
+            'album_art_url': data.get('album_art_url')
+        }).eq('id', item_id).eq('list_id', list_id).execute()
 
-    return jsonify({'success': True})
+        return jsonify({'success': True, 'updated': len(result.data) if result.data else 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/list/<list_id>/reorder', methods=['POST'])

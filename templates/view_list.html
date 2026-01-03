@@ -545,15 +545,15 @@ function updateStarDisplay(value) {
             fillSvg.style.clipPath = 'inset(0 0% 0 0)';
         } else if (value > index) {
             // Partial star - use adjusted percentages for better visual fill
-            // Star shape is narrow at edges, so we boost quarter values
+            // Values are symmetric: 0.25 and 0.75 should look like mirror images
             const fraction = value - index;
             let visualPercentage;
             if (fraction <= 0.25) {
-                visualPercentage = 40; // 0.25 star shows 40% width
+                visualPercentage = 30; // 0.25 star shows 30% width
             } else if (fraction <= 0.5) {
-                visualPercentage = 55; // 0.5 star shows 55% width
+                visualPercentage = 50; // 0.5 star shows 50% width (center)
             } else if (fraction <= 0.75) {
-                visualPercentage = 75; // 0.75 star shows 75% width
+                visualPercentage = 70; // 0.75 star shows 70% width (symmetric to 30%)
             } else {
                 visualPercentage = 100;
             }

@@ -151,48 +151,63 @@
     </div>
 </div>
 
-<!-- Public Lists -->
+<!-- Lists Section with Tabs -->
 <div>
-    <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-5">Public Lists</h2>
-    {% if lists %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {% for list in lists %}
-        <a href="{{ url_for('view_list', list_id=list.id) }}" class="card p-5 hover:border-accent transition block">
-            {% if list.preview_images %}
-            <div class="flex gap-1 mb-4">
-                {% for img in list.preview_images[:4] %}
-                <div class="w-12 h-12 rounded overflow-hidden bg-elevated">
-                    <img src="{{ img }}" alt="" class="w-full h-full object-cover">
+    <div class="flex gap-4 border-b border-border mb-5">
+        <button id="tab-public-lists" onclick="showListsTab('public')" class="text-sm font-semibold text-accent pb-3 border-b-2 border-accent">Public Lists</button>
+        <button id="tab-liked-lists" onclick="showListsTab('liked')" class="text-sm font-semibold text-muted pb-3 border-b-2 border-transparent hover:text-white">Liked Lists</button>
+    </div>
+
+    <!-- Public Lists Grid -->
+    <div id="public-lists-grid">
+        {% if lists %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {% for list in lists %}
+            <a href="{{ url_for('view_list', list_id=list.id) }}" class="card p-5 hover:border-accent transition block">
+                {% if list.preview_images %}
+                <div class="flex gap-1 mb-4">
+                    {% for img in list.preview_images[:4] %}
+                    <div class="w-12 h-12 rounded overflow-hidden bg-elevated">
+                        <img src="{{ img }}" alt="" class="w-full h-full object-cover">
+                    </div>
+                    {% endfor %}
+                    {% if list.item_count > 4 %}
+                    <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                        <span class="text-muted text-xs font-medium">+{{ list.item_count - 4 }}</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endfor %}
-                {% if list.item_count > 4 %}
-                <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
-                    <span class="text-muted text-xs font-medium">+{{ list.item_count - 4 }}</span>
+                {% else %}
+                <div class="flex gap-1 mb-4">
+                    <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                        <span class="text-muted text-lg">♪</span>
+                    </div>
                 </div>
                 {% endif %}
-            </div>
-            {% else %}
-            <div class="flex gap-1 mb-4">
-                <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
-                    <span class="text-muted text-lg">♪</span>
-                </div>
-            </div>
-            {% endif %}
-            <h3 class="font-semibold text-white leading-tight">{{ list.title }}</h3>
-            {% if list.description %}
-            <p class="text-sm text-muted mt-2 line-clamp-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
-            {% endif %}
-            <p class="text-xs text-muted mt-3">
-                {{ list.item_count }} song{{ 's' if list.item_count != 1 else '' }} · {{ 'Ranked' if list.is_ranked else 'Unranked' }}
-            </p>
-        </a>
-        {% endfor %}
+                <h3 class="font-semibold text-white leading-tight">{{ list.title }}</h3>
+                {% if list.description %}
+                <p class="text-sm text-muted mt-2 line-clamp-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+                {% endif %}
+                <p class="text-xs text-muted mt-3">
+                    {{ list.item_count }} song{{ 's' if list.item_count != 1 else '' }} · {{ 'Ranked' if list.is_ranked else 'Unranked' }}
+                    {% if list.like_count %}<span class="text-accent ml-1">♥ {{ list.like_count }}</span>{% endif %}
+                </p>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card text-center py-12 px-6">
+            <p class="text-muted">No public lists yet</p>
+        </div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="card text-center py-12 px-6">
-        <p class="text-muted">No public lists yet</p>
+
+    <!-- Liked Lists Grid (loaded via JS) -->
+    <div id="liked-lists-grid" class="hidden">
+        <div id="liked-lists-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <p class="text-muted text-sm col-span-full text-center py-12">Loading...</p>
+        </div>
     </div>
-    {% endif %}
 </div>
 
 {% if is_owner %}
@@ -227,6 +242,9 @@
 
 {% block scripts %}
 <script>
+const profileUserId = "{{ profile.id }}";
+let likedListsLoaded = false;
+
 // Ratings tab switching
 function showRatingsTab(type) {
     const albumTab = document.getElementById('tab-album-ratings');
@@ -249,6 +267,80 @@ function showRatingsTab(type) {
         songGrid.classList.remove('hidden');
         albumGrid.classList.add('hidden');
     }
+}
+
+// Lists tab switching
+function showListsTab(type) {
+    const publicTab = document.getElementById('tab-public-lists');
+    const likedTab = document.getElementById('tab-liked-lists');
+    const publicGrid = document.getElementById('public-lists-grid');
+    const likedGrid = document.getElementById('liked-lists-grid');
+
+    if (type === 'public') {
+        publicTab.classList.remove('text-muted', 'border-transparent');
+        publicTab.classList.add('text-accent', 'border-accent');
+        likedTab.classList.remove('text-accent', 'border-accent');
+        likedTab.classList.add('text-muted', 'border-transparent');
+        publicGrid.classList.remove('hidden');
+        likedGrid.classList.add('hidden');
+    } else {
+        likedTab.classList.remove('text-muted', 'border-transparent');
+        likedTab.classList.add('text-accent', 'border-accent');
+        publicTab.classList.remove('text-accent', 'border-accent');
+        publicTab.classList.add('text-muted', 'border-transparent');
+        likedGrid.classList.remove('hidden');
+        publicGrid.classList.add('hidden');
+
+        // Load liked lists if not already loaded
+        if (!likedListsLoaded) {
+            loadLikedLists();
+        }
+    }
+}
+
+function loadLikedLists() {
+    fetch(`/api/user/${profileUserId}/liked-lists`)
+        .then(res => res.json())
+        .then(data => {
+            likedListsLoaded = true;
+            const container = document.getElementById('liked-lists-content');
+
+            if (data.lists && data.lists.length > 0) {
+                container.innerHTML = data.lists.map(list => `
+                    <a href="/list/${list.id}" class="card p-5 hover:border-accent transition block">
+                        ${list.preview_images && list.preview_images.length > 0 ? `
+                        <div class="flex gap-1 mb-4">
+                            ${list.preview_images.slice(0, 4).map(img => `
+                                <div class="w-12 h-12 rounded overflow-hidden bg-elevated">
+                                    <img src="${img}" alt="" class="w-full h-full object-cover">
+                                </div>
+                            `).join('')}
+                            ${list.item_count > 4 ? `
+                                <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                                    <span class="text-muted text-xs font-medium">+${list.item_count - 4}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        ` : `
+                        <div class="flex gap-1 mb-4">
+                            <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                                <span class="text-muted text-lg">♪</span>
+                            </div>
+                        </div>
+                        `}
+                        <h3 class="font-semibold text-white leading-tight">${list.title}</h3>
+                        <p class="text-xs text-muted mt-1">by <span class="text-accent">${list.username}</span></p>
+                        ${list.description ? `<p class="text-sm text-muted mt-2 line-clamp-2">${list.description.substring(0, 80)}${list.description.length > 80 ? '...' : ''}</p>` : ''}
+                        <p class="text-xs text-muted mt-3">
+                            ${list.item_count} song${list.item_count !== 1 ? 's' : ''} · ${list.is_ranked ? 'Ranked' : 'Unranked'}
+                            ${list.like_count ? `<span class="text-accent ml-1">♥ ${list.like_count}</span>` : ''}
+                        </p>
+                    </a>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="card text-center py-12 px-6 col-span-full"><p class="text-muted">No liked lists yet</p></div>';
+            }
+        });
 }
 </script>
 {% if is_owner %}

@@ -16,7 +16,18 @@
                 {{ list.created_at[:10] }}
             </p>
         </div>
-        <div class="flex gap-2 flex-shrink-0">
+        <div class="flex gap-2 flex-shrink-0 items-center">
+            <!-- Like button -->
+            {% if not is_owner %}
+            <button id="like-btn" onclick="toggleLike()" class="like-btn flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-border hover:border-accent transition">
+                <span id="like-icon" class="text-lg">♡</span>
+                <span id="like-count">0</span>
+            </button>
+            {% else %}
+            <span id="like-count-display" class="text-muted text-sm flex items-center gap-1">
+                <span class="text-accent">♥</span> <span id="like-count">0</span> likes
+            </span>
+            {% endif %}
             {% if session.user %}
             <button onclick="duplicateList()" class="btn-secondary text-xs">Copy</button>
             {% endif %}
@@ -274,6 +285,16 @@
     background: rgba(34, 211, 238, 0.1);
     border: 1px solid #22d3ee;
 }
+
+/* Like button styles */
+.like-btn.liked {
+    background: rgba(34, 211, 238, 0.1);
+    border-color: #22d3ee;
+    color: #22d3ee;
+}
+.like-btn.liked #like-icon {
+    color: #22d3ee;
+}
 </style>
 
 <script>
@@ -283,6 +304,48 @@ let currentTrackData = null;
 let currentRating = 0;
 let selectedRating = 0;
 let currentRatingType = 'album'; // 'album' or 'song'
+let userLiked = false;
+const isLoggedIn = {{ 'true' if session.user else 'false' }};
+
+// Load like status on page load
+document.addEventListener('DOMContentLoaded', loadLikeStatus);
+
+function loadLikeStatus() {
+    fetch(`/api/list/${listId}/like-status`)
+        .then(res => res.json())
+        .then(data => {
+            userLiked = data.user_liked;
+            document.getElementById('like-count').textContent = data.like_count;
+            const likeBtn = document.getElementById('like-btn');
+            const likeIcon = document.getElementById('like-icon');
+            if (likeBtn) {
+                if (userLiked) {
+                    likeBtn.classList.add('liked');
+                    likeIcon.textContent = '♥';
+                } else {
+                    likeBtn.classList.remove('liked');
+                    likeIcon.textContent = '♡';
+                }
+            }
+        });
+}
+
+function toggleLike() {
+    if (!isLoggedIn) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const endpoint = userLiked ? `/api/list/${listId}/unlike` : `/api/list/${listId}/like`;
+    fetch(endpoint, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                userLiked = !userLiked;
+                loadLikeStatus();
+            }
+        });
+}
 
 // Close menu when clicking outside
 document.addEventListener('click', (e) => {

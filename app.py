@@ -41,12 +41,18 @@ def index():
     result = supabase.table('lists').select('*, profiles(username)').eq('is_public', True).order('created_at', desc=True).limit(12).execute()
     public_lists = result.data if result.data else []
 
-    # Get item counts and preview images for each list
+    # Get item counts, preview images, and like counts for each list
     for lst in public_lists:
         items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
         lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
         count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
         lst['item_count'] = count_result.count if count_result.count else 0
+        # Get like count
+        try:
+            like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', lst['id']).execute()
+            lst['like_count'] = like_result.count if like_result.count else 0
+        except Exception:
+            lst['like_count'] = 0
 
     return render_template('index.html', public_lists=public_lists)
 
@@ -485,12 +491,18 @@ def user_profile(username):
     lists_result = supabase.table('lists').select('*').eq('user_id', profile['id']).eq('is_public', True).order('created_at', desc=True).execute()
     lists = lists_result.data if lists_result.data else []
 
-    # Get item counts and preview images for each list
+    # Get item counts, preview images, and like counts for each list
     for lst in lists:
         items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
         lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
         count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
         lst['item_count'] = count_result.count if count_result.count else 0
+        # Get like count
+        try:
+            like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', lst['id']).execute()
+            lst['like_count'] = like_result.count if like_result.count else 0
+        except Exception:
+            lst['like_count'] = 0
 
     # Get favorite songs and albums (with error handling if table doesn't exist)
     favorite_songs = []
@@ -794,6 +806,270 @@ def get_user_ratings():
         return jsonify({'ratings': result.data if result.data else []})
     except Exception:
         return jsonify({'ratings': []})
+
+
+# ============== UNIFIED SEARCH API ==============
+
+@app.route('/api/search/unified')
+def unified_search():
+    """Unified search across profiles, lists, songs, and albums."""
+    query = request.args.get('q', '').strip()
+    if not query or len(query) < 2:
+        return jsonify({'profiles': [], 'lists': [], 'songs': [], 'albums': []})
+
+    results = {'profiles': [], 'lists': [], 'songs': [], 'albums': []}
+
+    try:
+        # Search profiles
+        profiles_result = supabase.table('profiles').select('*').ilike('username', f'%{query}%').limit(5).execute()
+        if profiles_result.data:
+            for p in profiles_result.data:
+                count_result = supabase.table('lists').select('id', count='exact').eq('user_id', p['id']).eq('is_public', True).execute()
+                results['profiles'].append({
+                    'username': p['username'],
+                    'list_count': count_result.count if count_result.count else 0
+                })
+
+        # Search lists (public only)
+        lists_result = supabase.table('lists').select('*, profiles(username)').ilike('title', f'%{query}%').eq('is_public', True).limit(5).execute()
+        if lists_result.data:
+            for l in lists_result.data:
+                # Get preview image
+                items_result = supabase.table('list_items').select('album_art_url').eq('list_id', l['id']).order('position').limit(1).execute()
+                preview_image = items_result.data[0]['album_art_url'] if items_result.data else None
+                # Get item count
+                count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', l['id']).execute()
+                # Get like count
+                like_count = 0
+                try:
+                    like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', l['id']).execute()
+                    like_count = like_result.count if like_result.count else 0
+                except Exception:
+                    pass
+                results['lists'].append({
+                    'id': l['id'],
+                    'title': l['title'],
+                    'username': l['profiles']['username'] if l.get('profiles') else 'Unknown',
+                    'preview_image': preview_image,
+                    'item_count': count_result.count if count_result.count else 0,
+                    'like_count': like_count
+                })
+
+        # Search songs via Spotify
+        try:
+            spotify_results = spotify.search(q=query, type='track', limit=5)
+            for item in spotify_results['tracks']['items']:
+                results['songs'].append({
+                    'id': item['id'],
+                    'name': item['name'],
+                    'artist': ', '.join(a['name'] for a in item['artists']),
+                    'album': item['album']['name'],
+                    'album_art': item['album']['images'][0]['url'] if item['album']['images'] else None
+                })
+        except Exception:
+            pass
+
+        # Search albums via Spotify
+        try:
+            album_results = spotify.search(q=query, type='album', limit=5)
+            for item in album_results['albums']['items']:
+                results['albums'].append({
+                    'id': item['id'],
+                    'name': item['name'],
+                    'artist': ', '.join(a['name'] for a in item['artists']),
+                    'album_art': item['images'][0]['url'] if item['images'] else None
+                })
+        except Exception:
+            pass
+
+    except Exception as e:
+        print(f"Search error: {e}")
+
+    return jsonify(results)
+
+
+@app.route('/api/item/details')
+def item_details():
+    """Get details for a song or album including average rating and lists containing it."""
+    item_type = request.args.get('type')  # 'song' or 'album'
+    name = request.args.get('name')
+    artist = request.args.get('artist')
+
+    if not item_type or not name or not artist:
+        return jsonify({'error': 'Missing parameters'}), 400
+
+    result = {
+        'avg_rating': None,
+        'rating_count': 0,
+        'user_rating': None,
+        'lists': []
+    }
+
+    try:
+        # Get average rating
+        if item_type == 'song':
+            ratings_result = supabase.table('song_ratings').select('rating').eq('track_name', name).eq('artist_name', artist).execute()
+        else:
+            ratings_result = supabase.table('album_ratings').select('rating').eq('album_name', name).eq('artist_name', artist).execute()
+
+        if ratings_result.data:
+            ratings = [r['rating'] for r in ratings_result.data]
+            result['avg_rating'] = sum(ratings) / len(ratings)
+            result['rating_count'] = len(ratings)
+
+        # Get user's rating if logged in
+        if 'user' in session:
+            user_id = session['user']['id']
+            if item_type == 'song':
+                user_rating = supabase.table('song_ratings').select('rating').eq('user_id', user_id).eq('track_name', name).eq('artist_name', artist).execute()
+            else:
+                user_rating = supabase.table('album_ratings').select('rating').eq('user_id', user_id).eq('album_name', name).eq('artist_name', artist).execute()
+
+            if user_rating.data:
+                result['user_rating'] = user_rating.data[0]['rating']
+
+        # Get lists containing this item, sorted by like count
+        if item_type == 'song':
+            list_items = supabase.table('list_items').select('list_id').eq('track_name', name).eq('artist_name', artist).execute()
+        else:
+            list_items = supabase.table('list_items').select('list_id').eq('album_name', name).eq('artist_name', artist).execute()
+
+        if list_items.data:
+            list_ids = list(set([item['list_id'] for item in list_items.data]))
+            lists_with_likes = []
+
+            for list_id in list_ids[:20]:  # Limit to 20 lists
+                list_data = supabase.table('lists').select('*, profiles(username)').eq('id', list_id).eq('is_public', True).single().execute()
+                if list_data.data:
+                    # Get like count
+                    like_count = 0
+                    try:
+                        like_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', list_id).execute()
+                        like_count = like_result.count if like_result.count else 0
+                    except Exception:
+                        pass
+
+                    # Get preview image and item count
+                    items_result = supabase.table('list_items').select('album_art_url').eq('list_id', list_id).order('position').limit(1).execute()
+                    preview_image = items_result.data[0]['album_art_url'] if items_result.data else None
+                    count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', list_id).execute()
+
+                    lists_with_likes.append({
+                        'id': list_id,
+                        'title': list_data.data['title'],
+                        'username': list_data.data['profiles']['username'] if list_data.data.get('profiles') else 'Unknown',
+                        'preview_image': preview_image,
+                        'item_count': count_result.count if count_result.count else 0,
+                        'like_count': like_count
+                    })
+
+            # Sort by like count descending
+            result['lists'] = sorted(lists_with_likes, key=lambda x: x['like_count'], reverse=True)
+
+    except Exception as e:
+        print(f"Item details error: {e}")
+
+    return jsonify(result)
+
+
+# ============== LIST LIKES API ==============
+
+@app.route('/api/list/<list_id>/like', methods=['POST'])
+@login_required
+def like_list(list_id):
+    """Like a list."""
+    user_id = session['user']['id']
+
+    try:
+        # Check if already liked
+        existing = supabase.table('list_likes').select('id').eq('user_id', user_id).eq('list_id', list_id).execute()
+
+        if existing.data:
+            return jsonify({'success': True, 'message': 'Already liked'})
+
+        # Add like
+        supabase.table('list_likes').insert({
+            'user_id': user_id,
+            'list_id': list_id
+        }).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/list/<list_id>/unlike', methods=['POST'])
+@login_required
+def unlike_list(list_id):
+    """Unlike a list."""
+    user_id = session['user']['id']
+
+    try:
+        supabase.table('list_likes').delete().eq('user_id', user_id).eq('list_id', list_id).execute()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/list/<list_id>/like-status')
+def get_like_status(list_id):
+    """Get like status and count for a list."""
+    try:
+        # Get like count
+        count_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', list_id).execute()
+        like_count = count_result.count if count_result.count else 0
+
+        # Check if current user has liked
+        user_liked = False
+        if 'user' in session:
+            user_id = session['user']['id']
+            existing = supabase.table('list_likes').select('id').eq('user_id', user_id).eq('list_id', list_id).execute()
+            user_liked = bool(existing.data)
+
+        return jsonify({
+            'like_count': like_count,
+            'user_liked': user_liked
+        })
+    except Exception:
+        return jsonify({'like_count': 0, 'user_liked': False})
+
+
+@app.route('/api/user/<user_id>/liked-lists')
+def get_user_liked_lists(user_id):
+    """Get lists that a user has liked."""
+    try:
+        # Get liked list IDs
+        likes_result = supabase.table('list_likes').select('list_id').eq('user_id', user_id).order('created_at', desc=True).execute()
+
+        if not likes_result.data:
+            return jsonify({'lists': []})
+
+        lists = []
+        for like in likes_result.data:
+            list_data = supabase.table('lists').select('*, profiles(username)').eq('id', like['list_id']).eq('is_public', True).single().execute()
+            if list_data.data:
+                # Get preview and count
+                items_result = supabase.table('list_items').select('album_art_url').eq('list_id', like['list_id']).order('position').limit(4).execute()
+                preview_images = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
+                count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', like['list_id']).execute()
+
+                # Get like count
+                like_count_result = supabase.table('list_likes').select('id', count='exact').eq('list_id', like['list_id']).execute()
+
+                lists.append({
+                    'id': like['list_id'],
+                    'title': list_data.data['title'],
+                    'description': list_data.data.get('description'),
+                    'is_ranked': list_data.data['is_ranked'],
+                    'username': list_data.data['profiles']['username'] if list_data.data.get('profiles') else 'Unknown',
+                    'preview_images': preview_images,
+                    'item_count': count_result.count if count_result.count else 0,
+                    'like_count': like_count_result.count if like_count_result.count else 0
+                })
+
+        return jsonify({'lists': lists})
+    except Exception as e:
+        return jsonify({'lists': [], 'error': str(e)})
 
 
 # ============== SONG RATINGS API ==============

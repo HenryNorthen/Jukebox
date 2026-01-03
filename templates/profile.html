@@ -107,7 +107,11 @@
     <!-- Album Ratings Grid -->
     <div id="album-ratings-grid" class="album-grid">
         {% for rating in album_ratings %}
-        <div class="album-tile group">
+        <div class="album-tile group clickable-tile"
+             data-type="album"
+             data-name="{{ rating.album_name }}"
+             data-artist="{{ rating.artist_name }}"
+             data-art="{{ rating.album_art_url }}">
             {% if rating.album_art_url %}
             <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
             {% else %}
@@ -130,7 +134,11 @@
     <!-- Song Ratings Grid -->
     <div id="song-ratings-grid" class="album-grid hidden">
         {% for rating in song_ratings %}
-        <div class="album-tile group">
+        <div class="album-tile group clickable-tile"
+             data-type="song"
+             data-name="{{ rating.track_name }}"
+             data-artist="{{ rating.artist_name }}"
+             data-art="{{ rating.album_art_url }}">
             {% if rating.album_art_url %}
             <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
             {% else %}
@@ -210,6 +218,74 @@
     </div>
 </div>
 
+<!-- Song/Album Detail Modal -->
+<div id="detail-modal" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-border">
+            <div class="flex justify-between items-start">
+                <div class="flex gap-4">
+                    <img id="detail-art" src="" alt="" class="w-24 h-24 rounded-lg object-cover bg-elevated flex-shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <p id="detail-type" class="text-xs text-muted uppercase tracking-wider mb-1"></p>
+                        <h2 id="detail-name" class="text-xl font-bold text-white truncate"></h2>
+                        <p id="detail-artist" class="text-muted truncate"></p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="text-muted hover:text-white text-2xl ml-4">&times;</button>
+            </div>
+
+            <!-- Rating Section -->
+            <div class="mt-6 flex items-center gap-8">
+                <!-- Average Rating -->
+                <div class="text-center">
+                    <p class="text-xs text-muted uppercase mb-1">Average</p>
+                    <div class="flex items-center gap-2">
+                        <span id="detail-avg-rating" class="text-2xl font-bold text-accent">-</span>
+                        <div class="text-muted">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="text-accent">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <p id="detail-rating-count" class="text-xs text-muted"></p>
+                </div>
+
+                <!-- Your Rating -->
+                <div class="flex-1">
+                    <p class="text-xs text-muted uppercase mb-2">Your Rating</p>
+                    <div id="detail-star-rating" class="detail-star-container" onmouseleave="resetDetailStarPreview()">
+                        {% for i in range(5) %}
+                        <div class="star-wrapper">
+                            <svg class="star-bg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <svg class="star-fill" viewBox="0 0 24 24" style="clip-path: inset(0 100% 0 0);">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <div class="star-quarters">
+                                <div class="quarter q1" data-value="{{ i + 0.25 }}" onmouseenter="previewDetailRating({{ i + 0.25 }})" onclick="setDetailRating({{ i + 0.25 }})"></div>
+                                <div class="quarter q2" data-value="{{ i + 0.5 }}" onmouseenter="previewDetailRating({{ i + 0.5 }})" onclick="setDetailRating({{ i + 0.5 }})"></div>
+                                <div class="quarter q3" data-value="{{ i + 0.75 }}" onmouseenter="previewDetailRating({{ i + 0.75 }})" onclick="setDetailRating({{ i + 0.75 }})"></div>
+                                <div class="quarter q4" data-value="{{ i + 1 }}" onmouseenter="previewDetailRating({{ i + 1 }})" onclick="setDetailRating({{ i + 1 }})"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p id="detail-your-rating" class="text-xs text-muted mt-1">{% if session.user %}Click to rate{% else %}Sign in to rate{% endif %}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lists containing this item -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <h3 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Lists featuring this <span id="detail-type-label">item</span></h3>
+            <div id="detail-lists" class="space-y-3">
+                <p class="text-muted text-sm">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% if is_owner %}
 <!-- Edit Favorites Modal -->
 <div id="edit-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
@@ -241,9 +317,57 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* Detail modal star rating */
+.detail-star-container {
+    display: flex;
+    gap: 4px;
+}
+.detail-star-container .star-wrapper {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+}
+.detail-star-container .star-wrapper svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.detail-star-container .star-bg {
+    fill: #3a3f47;
+}
+.detail-star-container .star-fill {
+    fill: #22d3ee;
+    transition: clip-path 0.1s ease;
+}
+.detail-star-container .star-quarters {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+.detail-star-container .quarter {
+    flex: 1;
+    height: 100%;
+}
+
+/* Clickable tiles */
+.clickable-tile {
+    cursor: pointer;
+}
+</style>
+
 <script>
 const profileUserId = "{{ profile.id }}";
 let likedListsLoaded = false;
+const isLoggedIn = {{ 'true' if session.user else 'false' }};
+let detailData = null;
+let detailRating = 0;
 
 // Ratings tab switching
 function showRatingsTab(type) {
@@ -342,6 +466,155 @@ function loadLikedLists() {
             }
         });
 }
+
+// Click handlers for rating tiles
+document.querySelectorAll('.clickable-tile').forEach(tile => {
+    tile.addEventListener('click', function() {
+        const type = this.dataset.type;
+        const name = this.dataset.name;
+        const artist = this.dataset.artist;
+        const art = this.dataset.art;
+
+        openDetailModal(type, { name, artist, album_art: art });
+    });
+});
+
+function openDetailModal(type, item) {
+    detailData = { type, ...item };
+    detailRating = 0;
+
+    document.getElementById('detail-type').textContent = type;
+    document.getElementById('detail-type-label').textContent = type;
+    document.getElementById('detail-name').textContent = item.name;
+    document.getElementById('detail-artist').textContent = item.artist;
+    document.getElementById('detail-art').src = item.album_art || '';
+    document.getElementById('detail-avg-rating').textContent = '-';
+    document.getElementById('detail-rating-count').textContent = '';
+    document.getElementById('detail-lists').innerHTML = '<p class="text-muted text-sm">Loading...</p>';
+
+    updateDetailStarDisplay(0);
+    document.getElementById('detail-your-rating').textContent = isLoggedIn ? 'Click to rate' : 'Sign in to rate';
+
+    document.getElementById('detail-modal').classList.remove('hidden');
+
+    loadDetailInfo(type, item);
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal').classList.add('hidden');
+    detailData = null;
+}
+
+function loadDetailInfo(type, item) {
+    const params = type === 'song'
+        ? `type=song&name=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(item.artist)}`
+        : `type=album&name=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(item.artist)}`;
+
+    fetch(`/api/item/details?${params}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.avg_rating) {
+                document.getElementById('detail-avg-rating').textContent = data.avg_rating.toFixed(1);
+                document.getElementById('detail-rating-count').textContent = `${data.rating_count} rating${data.rating_count !== 1 ? 's' : ''}`;
+            } else {
+                document.getElementById('detail-avg-rating').textContent = '-';
+                document.getElementById('detail-rating-count').textContent = 'No ratings yet';
+            }
+
+            if (data.user_rating) {
+                detailRating = data.user_rating;
+                updateDetailStarDisplay(detailRating);
+                document.getElementById('detail-your-rating').textContent = `${detailRating} stars`;
+            }
+
+            if (data.lists && data.lists.length > 0) {
+                document.getElementById('detail-lists').innerHTML = data.lists.map(l => `
+                    <a href="/list/${l.id}" class="block card p-3 hover:border-accent transition">
+                        <div class="flex items-center gap-3">
+                            ${l.preview_image ? `<img src="${l.preview_image}" class="w-10 h-10 rounded object-cover bg-elevated">` : '<div class="w-10 h-10 rounded bg-elevated flex items-center justify-center text-muted">♪</div>'}
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium text-sm text-white truncate">${l.title}</p>
+                                <p class="text-xs text-muted">by ${l.username} · ${l.item_count} songs${l.like_count ? ` · <span class="text-accent">♥ ${l.like_count}</span>` : ''}</p>
+                            </div>
+                        </div>
+                    </a>
+                `).join('');
+            } else {
+                document.getElementById('detail-lists').innerHTML = '<p class="text-muted text-sm">No lists feature this ' + type + ' yet</p>';
+            }
+        });
+}
+
+function previewDetailRating(value) {
+    if (!isLoggedIn) return;
+    updateDetailStarDisplay(value);
+    document.getElementById('detail-your-rating').textContent = `${value} stars`;
+}
+
+function resetDetailStarPreview() {
+    updateDetailStarDisplay(detailRating);
+    if (detailRating > 0) {
+        document.getElementById('detail-your-rating').textContent = `${detailRating} stars`;
+    } else {
+        document.getElementById('detail-your-rating').textContent = isLoggedIn ? 'Click to rate' : 'Sign in to rate';
+    }
+}
+
+function setDetailRating(value) {
+    if (!isLoggedIn) {
+        window.location.href = '/login';
+        return;
+    }
+
+    detailRating = value;
+    updateDetailStarDisplay(value);
+    document.getElementById('detail-your-rating').textContent = `${value} stars`;
+
+    const endpoint = detailData.type === 'album' ? '/api/album/rating' : '/api/song/rating';
+    const body = detailData.type === 'album'
+        ? { album_name: detailData.name, artist_name: detailData.artist, album_art_url: detailData.album_art, rating: value }
+        : { track_name: detailData.name, artist_name: detailData.artist, album_art_url: detailData.album_art, rating: value };
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    }).then(() => {
+        loadDetailInfo(detailData.type, detailData);
+    });
+}
+
+function updateDetailStarDisplay(value) {
+    const stars = document.querySelectorAll('#detail-star-rating .star-wrapper');
+    stars.forEach((star, index) => {
+        const fillSvg = star.querySelector('.star-fill');
+        const starValue = index + 1;
+
+        if (value >= starValue) {
+            fillSvg.style.clipPath = 'inset(0 0% 0 0)';
+        } else if (value > index) {
+            const fraction = value - index;
+            let visualPercentage;
+            if (fraction <= 0.25) {
+                visualPercentage = 30;
+            } else if (fraction <= 0.5) {
+                visualPercentage = 50;
+            } else if (fraction <= 0.75) {
+                visualPercentage = 70;
+            } else {
+                visualPercentage = 100;
+            }
+            fillSvg.style.clipPath = `inset(0 ${100 - visualPercentage}% 0 0)`;
+        } else {
+            fillSvg.style.clipPath = 'inset(0 100% 0 0)';
+        }
+    });
+}
+
+// Close detail modal on backdrop click
+document.getElementById('detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDetailModal();
+});
 </script>
 {% if is_owner %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>

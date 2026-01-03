@@ -34,7 +34,12 @@
 {% if items %}
     <div id="album-grid" class="album-grid">
         {% for item in items %}
-        <div class="album-tile group" data-id="{{ item.id }}">
+        <div class="album-tile group" data-id="{{ item.id }}"
+             data-track-id="{{ item.spotify_track_id }}"
+             data-track-name="{{ item.track_name }}"
+             data-artist-name="{{ item.artist_name }}"
+             data-album-name="{{ item.album_name }}"
+             data-album-art="{{ item.album_art_url }}">
             {% if item.album_art_url %}
                 <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}" draggable="false">
             {% else %}
@@ -47,8 +52,19 @@
                 <div class="rank-badge">{{ item.position }}</div>
             {% endif %}
 
+            <!-- Three-dot menu button -->
+            {% if session.user %}
+            <button class="tile-menu-btn" onclick="event.stopPropagation(); openTileMenu(this, '{{ item.id }}')">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                    <circle cx="10" cy="4" r="2"/>
+                    <circle cx="10" cy="10" r="2"/>
+                    <circle cx="10" cy="16" r="2"/>
+                </svg>
+            </button>
+            {% endif %}
+
             <!-- Hover overlay -->
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
                 <p class="text-white font-medium text-sm truncate">{{ item.track_name }}</p>
                 <p class="text-muted text-xs truncate">{{ item.artist_name }}</p>
             </div>
@@ -63,11 +79,474 @@
         {% endif %}
     </div>
 {% endif %}
+
+<!-- Tile Menu Dropdown -->
+<div id="tile-menu" class="tile-menu hidden">
+    <button onclick="openAddToListModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Add to list
+    </button>
+    <button onclick="addToListenList()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 8v4l3 3"/>
+            <circle cx="12" cy="12" r="10"/>
+        </svg>
+        Add to listen-list
+    </button>
+    <button onclick="openRatingModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        Rate album
+    </button>
+</div>
+
+<!-- Add to List Modal -->
+<div id="add-to-list-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-lg">Add to List</h3>
+            <button onclick="closeAddToListModal()" class="text-muted hover:text-white text-2xl">&times;</button>
+        </div>
+        <div id="user-lists-container" class="flex-1 overflow-y-auto space-y-2">
+            <p class="text-muted text-sm">Loading your lists...</p>
+        </div>
+        <div class="mt-4 pt-4 border-t border-border">
+            <button onclick="createNewListWithTrack()" class="btn-primary w-full text-sm">+ Create new list with this song</button>
+        </div>
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div id="rating-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-sm mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-lg">Rate Album</h3>
+            <button onclick="closeRatingModal()" class="text-muted hover:text-white text-2xl">&times;</button>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+            <img id="rating-album-art" src="" alt="" class="w-16 h-16 rounded object-cover bg-elevated">
+            <div class="flex-1 min-w-0">
+                <p id="rating-album-name" class="font-medium truncate"></p>
+                <p id="rating-artist-name" class="text-sm text-muted truncate"></p>
+            </div>
+        </div>
+        <div class="flex flex-col items-center">
+            <div id="star-rating" class="star-rating-container" onmouseleave="resetStarPreview()">
+                <!-- 5 stars, each divided into 4 quarters -->
+                {% for i in range(5) %}
+                <div class="star-wrapper">
+                    <svg class="star-bg" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    <svg class="star-fill" viewBox="0 0 24 24" style="clip-path: inset(0 100% 0 0);">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    <div class="star-quarters">
+                        <div class="quarter q1" data-value="{{ i + 0.25 }}" onmouseenter="previewRating({{ i + 0.25 }})" onclick="setRating({{ i + 0.25 }})"></div>
+                        <div class="quarter q2" data-value="{{ i + 0.5 }}" onmouseenter="previewRating({{ i + 0.5 }})" onclick="setRating({{ i + 0.5 }})"></div>
+                        <div class="quarter q3" data-value="{{ i + 0.75 }}" onmouseenter="previewRating({{ i + 0.75 }})" onclick="setRating({{ i + 0.75 }})"></div>
+                        <div class="quarter q4" data-value="{{ i + 1 }}" onmouseenter="previewRating({{ i + 1 }})" onclick="setRating({{ i + 1 }})"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <p id="rating-display" class="text-muted text-sm mt-3">Click to rate</p>
+        </div>
+        <div class="mt-6 flex gap-3">
+            <button onclick="clearRating()" class="btn-secondary flex-1 text-sm">Clear</button>
+            <button onclick="saveRating()" class="btn-primary flex-1 text-sm">Save</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+.tile-menu-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 6px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+    cursor: pointer;
+    border: none;
+}
+.tile-menu-btn:hover {
+    background: rgba(0, 0, 0, 0.95);
+}
+.album-tile:hover .tile-menu-btn {
+    opacity: 1;
+}
+
+.tile-menu {
+    position: fixed;
+    background: #1c2228;
+    border: 1px solid #3a3f47;
+    border-radius: 8px;
+    padding: 6px;
+    z-index: 100;
+    min-width: 180px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.tile-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    color: #99aabb;
+    font-size: 14px;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tile-menu button:hover {
+    background: #242c34;
+    color: white;
+}
+
+/* Star rating styles */
+.star-rating-container {
+    display: flex;
+    gap: 4px;
+}
+.star-wrapper {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+}
+.star-wrapper svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.star-bg {
+    fill: #3a3f47;
+}
+.star-fill {
+    fill: #22d3ee;
+    transition: clip-path 0.1s ease;
+}
+.star-quarters {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+.quarter {
+    flex: 1;
+    height: 100%;
+}
+
+/* User list items in modal */
+.user-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #242c34;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.user-list-item:hover {
+    background: #2a343e;
+}
+.user-list-item.added {
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px solid #22d3ee;
+}
+</style>
+
 <script>
 const listId = "{{ list.id }}";
+let currentTileId = null;
+let currentTrackData = null;
+let currentRating = 0;
+let selectedRating = 0;
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('tile-menu');
+    if (!menu.classList.contains('hidden') && !e.target.closest('.tile-menu-btn')) {
+        menu.classList.add('hidden');
+    }
+});
+
+function openTileMenu(btn, itemId) {
+    const menu = document.getElementById('tile-menu');
+    const tile = btn.closest('.album-tile');
+    const rect = btn.getBoundingClientRect();
+
+    currentTileId = itemId;
+    currentTrackData = {
+        trackId: tile.dataset.trackId,
+        trackName: tile.dataset.trackName,
+        artistName: tile.dataset.artistName,
+        albumName: tile.dataset.albumName,
+        albumArt: tile.dataset.albumArt
+    };
+
+    // Position menu below button
+    menu.style.top = `${rect.bottom + 8}px`;
+    menu.style.left = `${rect.left - 140}px`;
+
+    // Keep menu in viewport
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - 200}px`;
+    }
+
+    menu.classList.remove('hidden');
+}
+
+function openAddToListModal() {
+    document.getElementById('tile-menu').classList.add('hidden');
+    document.getElementById('add-to-list-modal').classList.remove('hidden');
+    loadUserLists();
+}
+
+function closeAddToListModal() {
+    document.getElementById('add-to-list-modal').classList.add('hidden');
+}
+
+function loadUserLists() {
+    const container = document.getElementById('user-lists-container');
+    container.innerHTML = '<p class="text-muted text-sm">Loading your lists...</p>';
+
+    fetch('/api/user/lists')
+        .then(res => res.json())
+        .then(data => {
+            if (data.lists && data.lists.length > 0) {
+                container.innerHTML = data.lists.map(list => `
+                    <div class="user-list-item" onclick="addTrackToList('${list.id}', this)">
+                        <div class="w-10 h-10 rounded bg-elevated flex items-center justify-center text-muted">
+                            ${list.preview_image ? `<img src="${list.preview_image}" class="w-full h-full object-cover rounded">` : '♪'}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-sm truncate">${list.title}</p>
+                            <p class="text-xs text-muted">${list.item_count} songs</p>
+                        </div>
+                        <span class="add-status text-accent text-xs hidden">Added!</span>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="text-muted text-sm text-center py-4">You don\'t have any lists yet</p>';
+            }
+        })
+        .catch(() => {
+            container.innerHTML = '<p class="text-red-400 text-sm">Failed to load lists</p>';
+        });
+}
+
+function addTrackToList(targetListId, element) {
+    fetch(`/api/list/${targetListId}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            track_id: currentTrackData.trackId,
+            track_name: currentTrackData.trackName,
+            artist_name: currentTrackData.artistName,
+            album_name: currentTrackData.albumName,
+            album_art_url: currentTrackData.albumArt
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            element.classList.add('added');
+            element.querySelector('.add-status').classList.remove('hidden');
+            // Update count
+            const countEl = element.querySelector('.text-xs.text-muted');
+            const currentCount = parseInt(countEl.textContent) || 0;
+            countEl.textContent = `${currentCount + 1} songs`;
+        } else {
+            alert(data.error || 'Failed to add to list');
+        }
+    });
+}
+
+function createNewListWithTrack() {
+    const title = prompt('Enter a name for your new list:');
+    if (!title) return;
+
+    fetch('/api/list/create-with-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: title,
+            track: currentTrackData
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.list_id) {
+            closeAddToListModal();
+            window.location.href = `/list/${data.list_id}/edit`;
+        } else {
+            alert(data.error || 'Failed to create list');
+        }
+    });
+}
+
+function addToListenList() {
+    document.getElementById('tile-menu').classList.add('hidden');
+
+    fetch('/api/listen-list/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            album_name: currentTrackData.albumName,
+            artist_name: currentTrackData.artistName,
+            album_art_url: currentTrackData.albumArt
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Show brief confirmation
+            showToast('Added to listen-list');
+        } else {
+            alert(data.error || 'Failed to add to listen-list');
+        }
+    });
+}
+
+function openRatingModal() {
+    document.getElementById('tile-menu').classList.add('hidden');
+
+    // Set album info in modal
+    document.getElementById('rating-album-art').src = currentTrackData.albumArt || '';
+    document.getElementById('rating-album-name').textContent = currentTrackData.albumName;
+    document.getElementById('rating-artist-name').textContent = currentTrackData.artistName;
+
+    // Load existing rating
+    loadExistingRating();
+
+    document.getElementById('rating-modal').classList.remove('hidden');
+}
+
+function closeRatingModal() {
+    document.getElementById('rating-modal').classList.add('hidden');
+    selectedRating = 0;
+    updateStarDisplay(0);
+}
+
+function loadExistingRating() {
+    fetch(`/api/album/rating?album=${encodeURIComponent(currentTrackData.albumName)}&artist=${encodeURIComponent(currentTrackData.artistName)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.rating) {
+                selectedRating = data.rating;
+                updateStarDisplay(selectedRating);
+                document.getElementById('rating-display').textContent = `${selectedRating} stars`;
+            } else {
+                selectedRating = 0;
+                updateStarDisplay(0);
+                document.getElementById('rating-display').textContent = 'Click to rate';
+            }
+        });
+}
+
+function previewRating(value) {
+    updateStarDisplay(value);
+    document.getElementById('rating-display').textContent = `${value} stars`;
+}
+
+function resetStarPreview() {
+    updateStarDisplay(selectedRating);
+    if (selectedRating > 0) {
+        document.getElementById('rating-display').textContent = `${selectedRating} stars`;
+    } else {
+        document.getElementById('rating-display').textContent = 'Click to rate';
+    }
+}
+
+function setRating(value) {
+    selectedRating = value;
+    updateStarDisplay(value);
+    document.getElementById('rating-display').textContent = `${value} stars`;
+}
+
+function updateStarDisplay(value) {
+    const stars = document.querySelectorAll('.star-wrapper');
+    stars.forEach((star, index) => {
+        const fillSvg = star.querySelector('.star-fill');
+        const starValue = index + 1;
+
+        if (value >= starValue) {
+            // Full star
+            fillSvg.style.clipPath = 'inset(0 0% 0 0)';
+        } else if (value > index) {
+            // Partial star
+            const percentage = (value - index) * 100;
+            fillSvg.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+        } else {
+            // Empty star
+            fillSvg.style.clipPath = 'inset(0 100% 0 0)';
+        }
+    });
+}
+
+function clearRating() {
+    selectedRating = 0;
+    updateStarDisplay(0);
+    document.getElementById('rating-display').textContent = 'Click to rate';
+}
+
+function saveRating() {
+    fetch('/api/album/rating', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            album_name: currentTrackData.albumName,
+            artist_name: currentTrackData.artistName,
+            album_art_url: currentTrackData.albumArt,
+            rating: selectedRating
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeRatingModal();
+            showToast(selectedRating > 0 ? `Rated ${selectedRating} stars` : 'Rating cleared');
+        } else {
+            alert(data.error || 'Failed to save rating');
+        }
+    });
+}
+
+function showToast(message) {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-accent text-base px-4 py-2 rounded-lg font-medium text-sm z-50';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+        toast.remove();
+    }, 2000);
+}
 
 function duplicateList() {
     if (!confirm('Create a copy of this list to your account?')) return;
@@ -85,6 +564,14 @@ function duplicateList() {
         }
     });
 }
+
+// Close modals on backdrop click
+document.getElementById('add-to-list-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddToListModal();
+});
+document.getElementById('rating-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeRatingModal();
+});
 </script>
 
 {% if is_owner and items %}

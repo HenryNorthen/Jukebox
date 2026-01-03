@@ -595,6 +595,194 @@ def remove_favorite(favorite_type, position):
     return jsonify({'success': True})
 
 
+# ============== USER LISTS API ==============
+
+@app.route('/api/user/lists')
+@login_required
+def get_user_lists():
+    """Get all lists for the current user (for add-to-list modal)."""
+    user_id = session['user']['id']
+
+    result = supabase.table('lists').select('id, title').eq('user_id', user_id).order('created_at', desc=True).execute()
+    lists = result.data if result.data else []
+
+    # Get item counts and first image for each list
+    for lst in lists:
+        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(1).execute()
+        lst['preview_image'] = items_result.data[0]['album_art_url'] if items_result.data else None
+        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
+        lst['item_count'] = count_result.count if count_result.count else 0
+
+    return jsonify({'lists': lists})
+
+
+@app.route('/api/list/create-with-track', methods=['POST'])
+@login_required
+def create_list_with_track():
+    """Create a new list and add a track to it."""
+    data = request.json
+    title = data.get('title')
+    track = data.get('track')
+
+    if not title or not track:
+        return jsonify({'error': 'Title and track required'}), 400
+
+    try:
+        # Create the list
+        list_result = supabase.table('lists').insert({
+            'user_id': session['user']['id'],
+            'title': title,
+            'is_ranked': True,
+            'is_public': False
+        }).execute()
+
+        if not list_result.data:
+            return jsonify({'error': 'Failed to create list'}), 500
+
+        list_id = list_result.data[0]['id']
+
+        # Add the track
+        supabase.table('list_items').insert({
+            'list_id': list_id,
+            'spotify_track_id': track.get('trackId'),
+            'track_name': track.get('trackName'),
+            'artist_name': track.get('artistName'),
+            'album_name': track.get('albumName'),
+            'album_art_url': track.get('albumArt'),
+            'position': 1
+        }).execute()
+
+        return jsonify({'success': True, 'list_id': list_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============== LISTEN LIST API ==============
+
+@app.route('/api/listen-list/add', methods=['POST'])
+@login_required
+def add_to_listen_list():
+    """Add an album to user's listen-list (albums to listen to later)."""
+    user_id = session['user']['id']
+    data = request.json
+
+    try:
+        # Check if already in listen list
+        existing = supabase.table('listen_list').select('id').eq('user_id', user_id).eq('album_name', data.get('album_name')).eq('artist_name', data.get('artist_name')).execute()
+
+        if existing.data:
+            return jsonify({'success': True, 'message': 'Already in listen-list'})
+
+        # Add to listen list
+        supabase.table('listen_list').insert({
+            'user_id': user_id,
+            'album_name': data.get('album_name'),
+            'artist_name': data.get('artist_name'),
+            'album_art_url': data.get('album_art_url')
+        }).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/listen-list', methods=['GET'])
+@login_required
+def get_listen_list():
+    """Get user's listen-list."""
+    user_id = session['user']['id']
+
+    try:
+        result = supabase.table('listen_list').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+        return jsonify({'items': result.data if result.data else []})
+    except Exception:
+        return jsonify({'items': []})
+
+
+@app.route('/api/listen-list/<item_id>', methods=['DELETE'])
+@login_required
+def remove_from_listen_list(item_id):
+    """Remove an album from listen-list."""
+    user_id = session['user']['id']
+    supabase.table('listen_list').delete().eq('id', item_id).eq('user_id', user_id).execute()
+    return jsonify({'success': True})
+
+
+# ============== ALBUM RATINGS API ==============
+
+@app.route('/api/album/rating', methods=['GET'])
+@login_required
+def get_album_rating():
+    """Get user's rating for an album."""
+    user_id = session['user']['id']
+    album_name = request.args.get('album')
+    artist_name = request.args.get('artist')
+
+    try:
+        result = supabase.table('album_ratings').select('rating').eq('user_id', user_id).eq('album_name', album_name).eq('artist_name', artist_name).single().execute()
+
+        if result.data:
+            return jsonify({'rating': result.data['rating']})
+        return jsonify({'rating': None})
+    except Exception:
+        return jsonify({'rating': None})
+
+
+@app.route('/api/album/rating', methods=['POST'])
+@login_required
+def save_album_rating():
+    """Save or update user's rating for an album."""
+    user_id = session['user']['id']
+    data = request.json
+
+    album_name = data.get('album_name')
+    artist_name = data.get('artist_name')
+    rating = data.get('rating')
+
+    try:
+        # Check if rating exists
+        existing = supabase.table('album_ratings').select('id').eq('user_id', user_id).eq('album_name', album_name).eq('artist_name', artist_name).execute()
+
+        if rating == 0:
+            # Delete rating if set to 0
+            if existing.data:
+                supabase.table('album_ratings').delete().eq('id', existing.data[0]['id']).execute()
+            return jsonify({'success': True})
+
+        if existing.data:
+            # Update existing rating
+            supabase.table('album_ratings').update({
+                'rating': rating,
+                'album_art_url': data.get('album_art_url')
+            }).eq('id', existing.data[0]['id']).execute()
+        else:
+            # Insert new rating
+            supabase.table('album_ratings').insert({
+                'user_id': user_id,
+                'album_name': album_name,
+                'artist_name': artist_name,
+                'album_art_url': data.get('album_art_url'),
+                'rating': rating
+            }).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/album/ratings')
+@login_required
+def get_user_ratings():
+    """Get all of user's album ratings."""
+    user_id = session['user']['id']
+
+    try:
+        result = supabase.table('album_ratings').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+        return jsonify({'ratings': result.data if result.data else []})
+    except Exception:
+        return jsonify({'ratings': []})
+
+
 if __name__ == '__main__':
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'

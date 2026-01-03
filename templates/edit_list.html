@@ -5,8 +5,51 @@
 {% block content %}
 <div class="mb-8">
     <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-dark">{{ list.title }}</h1>
-        <a href="{{ url_for('view_list', list_id=list.id) }}" class="text-dark font-medium hover:underline">View List</a>
+        <h1 id="list-title-display" class="text-3xl font-bold text-dark">{{ list.title }}</h1>
+        <div class="flex gap-4">
+            <button onclick="duplicateList()" class="text-forest font-medium hover:underline">Duplicate</button>
+            <a href="{{ url_for('view_list', list_id=list.id) }}" class="text-dark font-medium hover:underline">View List</a>
+        </div>
+    </div>
+</div>
+
+<!-- List Settings -->
+<div class="bg-cardbg rounded-lg shadow-md p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold text-dark">List Settings</h2>
+        <span id="settings-status" class="text-sm text-forest hidden">Saved!</span>
+    </div>
+
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-dark mb-1">Title</label>
+            <input type="text" id="settings-title" value="{{ list.title }}"
+                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-dark mb-1">Description</label>
+            <textarea id="settings-description" rows="2"
+                      class="w-full px-4 py-2 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">{{ list.description or '' }}</textarea>
+        </div>
+
+        <div class="flex gap-6">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="settings-public" {% if list.is_public %}checked{% endif %}
+                       class="w-4 h-4 accent-dark">
+                <span class="text-dark">Public</span>
+            </label>
+
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="settings-ranked" {% if list.is_ranked %}checked{% endif %}
+                       class="w-4 h-4 accent-dark">
+                <span class="text-dark">Ranked</span>
+            </label>
+        </div>
+
+        <button onclick="saveSettings()" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
+            Save Settings
+        </button>
     </div>
 </div>
 
@@ -478,6 +521,66 @@ function selectSwapTrack(track) {
 swapModal.addEventListener('click', function(e) {
     if (e.target === swapModal) closeSwapModal();
 });
+
+// Settings functionality
+function saveSettings() {
+    const title = document.getElementById('settings-title').value.trim();
+    const description = document.getElementById('settings-description').value.trim();
+    const isPublic = document.getElementById('settings-public').checked;
+    const isRanked = document.getElementById('settings-ranked').checked;
+
+    if (!title) {
+        alert('Title is required');
+        return;
+    }
+
+    fetch(`/api/list/${listId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: title,
+            description: description,
+            is_public: isPublic,
+            is_ranked: isRanked
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Update page title
+            document.getElementById('list-title-display').textContent = title;
+            document.title = `Edit: ${title} - Jukebox`;
+
+            // Show saved status
+            const status = document.getElementById('settings-status');
+            status.classList.remove('hidden');
+            setTimeout(() => status.classList.add('hidden'), 2000);
+
+            // Reload if ranked status changed to update UI
+            if (isRanked !== {{ 'true' if list.is_ranked else 'false' }}) {
+                location.reload();
+            }
+        }
+    });
+}
+
+// Duplicate list
+function duplicateList() {
+    if (!confirm('Create a copy of this list?')) return;
+
+    fetch(`/api/list/${listId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.new_list_id) {
+            window.location.href = `/list/${data.new_list_id}/edit`;
+        } else {
+            alert('Failed to duplicate list');
+        }
+    });
+}
 
 </script>
 {% endblock %}

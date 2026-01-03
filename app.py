@@ -291,6 +291,80 @@ def update_list_item(list_id, item_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/list/<list_id>/settings', methods=['POST'])
+@login_required
+def update_list_settings(list_id):
+    """Update list settings (title, description, public, ranked)."""
+    # Verify ownership
+    list_result = supabase.table('lists').select('id').eq('id', list_id).eq('user_id', session['user']['id']).single().execute()
+    if not list_result.data:
+        return jsonify({'error': 'Access denied'}), 403
+
+    data = request.json
+    update_data = {}
+
+    if 'title' in data:
+        update_data['title'] = data['title']
+    if 'description' in data:
+        update_data['description'] = data['description']
+    if 'is_public' in data:
+        update_data['is_public'] = data['is_public']
+    if 'is_ranked' in data:
+        update_data['is_ranked'] = data['is_ranked']
+
+    if update_data:
+        supabase.table('lists').update(update_data).eq('id', list_id).execute()
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/list/<list_id>/duplicate', methods=['POST'])
+@login_required
+def duplicate_list(list_id):
+    """Duplicate a list (own list or public list)."""
+    # Get the source list
+    list_result = supabase.table('lists').select('*').eq('id', list_id).single().execute()
+    if not list_result.data:
+        return jsonify({'error': 'List not found'}), 404
+
+    source_list = list_result.data
+
+    # Check access - must be owner or list must be public
+    is_owner = session['user']['id'] == source_list['user_id']
+    if not source_list['is_public'] and not is_owner:
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Create new list
+    new_list = supabase.table('lists').insert({
+        'user_id': session['user']['id'],
+        'title': source_list['title'] + ' (Copy)',
+        'description': source_list['description'],
+        'is_ranked': source_list['is_ranked'],
+        'is_public': False  # Copies start as private
+    }).execute()
+
+    if not new_list.data:
+        return jsonify({'error': 'Failed to create list'}), 500
+
+    new_list_id = new_list.data[0]['id']
+
+    # Copy all items
+    items_result = supabase.table('list_items').select('*').eq('list_id', list_id).order('position').execute()
+    if items_result.data:
+        for item in items_result.data:
+            supabase.table('list_items').insert({
+                'list_id': new_list_id,
+                'position': item['position'],
+                'spotify_track_id': item['spotify_track_id'],
+                'track_name': item['track_name'],
+                'artist_name': item['artist_name'],
+                'album_name': item['album_name'],
+                'album_art_url': item['album_art_url']
+            }).execute()
+
+    return jsonify({'success': True, 'new_list_id': new_list_id})
+
+
 @app.route('/api/list/<list_id>/reorder', methods=['POST'])
 @login_required
 def reorder_list(list_id):

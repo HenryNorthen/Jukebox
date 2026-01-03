@@ -49,7 +49,11 @@
     </div>
     <div class="flex gap-3 flex-wrap">
         {% for song in favorite_songs %}
-        <div class="w-28 group">
+        <div class="w-28 group clickable-fav"
+             data-type="song"
+             data-name="{{ song.name }}"
+             data-artist="{{ song.artist_name }}"
+             data-art="{{ song.album_art_url }}">
             <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
                 {% if song.album_art_url %}
                 <img src="{{ song.album_art_url }}" alt="{{ song.name }}" class="w-full h-full object-cover">
@@ -85,7 +89,11 @@
     </div>
     <div class="flex gap-3 flex-wrap">
         {% for album in favorite_albums %}
-        <div class="w-28 group">
+        <div class="w-28 group clickable-fav"
+             data-type="album"
+             data-name="{{ album.name }}"
+             data-artist="{{ album.artist_name }}"
+             data-art="{{ album.album_art_url }}">
             <div class="aspect-square rounded-lg overflow-hidden bg-elevated mb-2">
                 {% if album.album_art_url %}
                 <img src="{{ album.album_art_url }}" alt="{{ album.name }}" class="w-full h-full object-cover">
@@ -371,7 +379,8 @@
 }
 
 /* Clickable tiles */
-.clickable-tile {
+.clickable-tile,
+.clickable-fav {
     cursor: pointer;
 }
 
@@ -535,6 +544,18 @@ function loadLikedLists() {
 
 // Click handlers for rating tiles
 document.querySelectorAll('.clickable-tile').forEach(tile => {
+    tile.addEventListener('click', function() {
+        const type = this.dataset.type;
+        const name = this.dataset.name;
+        const artist = this.dataset.artist;
+        const art = this.dataset.art;
+
+        openDetailModal(type, { name, artist, album_art: art });
+    });
+});
+
+// Click handlers for favorite songs/albums
+document.querySelectorAll('.clickable-fav').forEach(tile => {
     tile.addEventListener('click', function() {
         const type = this.dataset.type;
         const name = this.dataset.name;

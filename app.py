@@ -125,6 +125,16 @@ def dashboard():
     result = supabase.table('lists').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
     my_lists = result.data if result.data else []
 
+    # Get item counts and preview images for each list
+    for lst in my_lists:
+        items_result = supabase.table('list_items').select('album_art_url').eq('list_id', lst['id']).order('position').limit(4).execute()
+        lst['item_count'] = len(items_result.data) if items_result.data else 0
+        lst['preview_images'] = [item['album_art_url'] for item in (items_result.data or []) if item.get('album_art_url')]
+
+        # Get total count
+        count_result = supabase.table('list_items').select('id', count='exact').eq('list_id', lst['id']).execute()
+        lst['item_count'] = count_result.count if count_result.count else 0
+
     return render_template('dashboard.html', lists=my_lists)
 
 
@@ -289,6 +299,24 @@ def update_list_item(list_id, item_id):
         return jsonify({'success': True, 'updated': len(result.data) if result.data else 0})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/list/<list_id>/delete', methods=['DELETE'])
+@login_required
+def delete_list(list_id):
+    """Delete a list and all its items."""
+    # Verify ownership
+    list_result = supabase.table('lists').select('id').eq('id', list_id).eq('user_id', session['user']['id']).single().execute()
+    if not list_result.data:
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Delete all items first
+    supabase.table('list_items').delete().eq('list_id', list_id).execute()
+
+    # Delete the list
+    supabase.table('lists').delete().eq('id', list_id).execute()
+
+    return jsonify({'success': True})
 
 
 @app.route('/api/list/<list_id>/settings', methods=['POST'])

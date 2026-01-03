@@ -47,9 +47,14 @@
             </label>
         </div>
 
-        <button onclick="saveSettings()" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
-            Save Settings
-        </button>
+        <div class="flex justify-between items-center">
+            <button onclick="saveSettings()" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
+                Save Settings
+            </button>
+            <button onclick="deleteList()" class="text-red-600 hover:text-red-800 text-sm font-medium">
+                Delete List
+            </button>
+        </div>
     </div>
 </div>
 
@@ -578,6 +583,24 @@ function duplicateList() {
             window.location.href = `/list/${data.new_list_id}/edit`;
         } else {
             alert('Failed to duplicate list');
+        }
+    });
+}
+
+// Delete list
+function deleteList() {
+    if (!confirm('Are you sure you want to delete this list? This cannot be undone.')) return;
+
+    fetch(`/api/list/${listId}/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = '/dashboard';
+        } else {
+            alert('Failed to delete list');
         }
     });
 }

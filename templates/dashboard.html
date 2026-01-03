@@ -15,6 +15,22 @@
         {% for list in lists %}
         <div class="bg-cardbg rounded-lg shadow-md overflow-hidden border-l-4 border-dark">
             <a href="{{ url_for('view_list', list_id=list.id) }}" class="block p-5 hover:bg-khakilight transition">
+                <!-- Album art preview -->
+                {% if list.preview_images %}
+                <div class="flex gap-1 mb-3">
+                    {% for img in list.preview_images[:4] %}
+                    <div class="w-12 h-12 rounded overflow-hidden shadow-sm">
+                        <img src="{{ img }}" alt="" class="w-full h-full object-cover">
+                    </div>
+                    {% endfor %}
+                    {% if list.item_count > 4 %}
+                    <div class="w-12 h-12 rounded bg-dark flex items-center justify-center">
+                        <span class="text-khaki text-xs font-bold">+{{ list.item_count - 4 }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <div class="flex justify-between items-start">
                     <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
                     <span class="text-xs px-2 py-1 rounded {% if list.is_public %}bg-dark text-khaki{% else %}bg-khaki text-dark{% endif %}">
@@ -25,7 +41,7 @@
                     <p class="text-sm text-forest mt-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
                 {% endif %}
                 <p class="text-xs text-forest mt-3 font-medium">
-                    {{ 'Ranked' if list.is_ranked else 'Unranked' }} list
+                    {{ list.item_count }} song{{ 's' if list.item_count != 1 else '' }} · {{ 'Ranked' if list.is_ranked else 'Unranked' }}
                 </p>
             </a>
             <div class="border-t border-khaki px-5 py-3 bg-khakilight">

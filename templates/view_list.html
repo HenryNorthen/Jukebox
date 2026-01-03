@@ -10,6 +10,8 @@
             <p class="text-forest mt-1">
                 by <a href="{{ url_for('user_profile', username=list.profiles.username) }}" class="text-dark font-medium hover:underline">{{ list.profiles.username if list.profiles else 'Unknown' }}</a>
                 {% if list.is_ranked %}<span class="text-khaki mx-2">|</span> <span class="text-forest">Ranked</span>{% endif %}
+                <span class="text-khaki mx-2">|</span> <span class="text-forest">{{ items|length }} song{{ 's' if items|length != 1 else '' }}</span>
+                <span class="text-khaki mx-2">|</span> <span class="text-forest">Created {{ list.created_at[:10] }}</span>
             </p>
         </div>
         <div class="flex gap-3">

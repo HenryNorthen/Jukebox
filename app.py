@@ -822,7 +822,7 @@ def upload_profile_picture():
         ext = file.content_type.split('/')[-1]
         if ext == 'jpeg':
             ext = 'jpg'
-        filename = f"profile-pictures/{user_id}.{ext}"
+        filename = f"{user_id}.{ext}"
 
         # Read file content
         file_content = file.read()
@@ -830,11 +830,11 @@ def upload_profile_picture():
         # Upload to Supabase Storage
         # First try to remove old picture if exists
         try:
-            supabase.storage.from_('avatars').remove([f"profile-pictures/{user_id}.jpg", f"profile-pictures/{user_id}.png", f"profile-pictures/{user_id}.webp"])
+            supabase.storage.from_('avatars').remove([f"{user_id}.jpg", f"{user_id}.png", f"{user_id}.webp"])
         except Exception:
             pass
 
-        # Upload new picture
+        # Upload new picture with upsert
         result = supabase.storage.from_('avatars').upload(
             filename,
             file_content,
@@ -853,7 +853,7 @@ def upload_profile_picture():
 
     except Exception as e:
         print(f"Profile picture upload error: {e}")
-        return jsonify({'error': 'Failed to upload picture'}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/profile/picture', methods=['DELETE'])
@@ -866,9 +866,9 @@ def delete_profile_picture():
         # Remove from storage
         try:
             supabase.storage.from_('avatars').remove([
-                f"profile-pictures/{user_id}.jpg",
-                f"profile-pictures/{user_id}.png",
-                f"profile-pictures/{user_id}.webp"
+                f"{user_id}.jpg",
+                f"{user_id}.png",
+                f"{user_id}.webp"
             ])
         except Exception:
             pass
@@ -882,7 +882,7 @@ def delete_profile_picture():
 
     except Exception as e:
         print(f"Profile picture delete error: {e}")
-        return jsonify({'error': 'Failed to delete picture'}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/profile/favorites', methods=['GET'])

@@ -2,9 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from functools import wraps
 from supabase import create_client, Client
 import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-from datetime import timedelta
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
+from datetime import timedelta, datetime
 from config import Config
+import urllib.parse
+import requests
+import base64
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -20,6 +23,112 @@ spotify = spotipy.Spotify(
         client_secret=Config.SPOTIFY_CLIENT_SECRET
     )
 )
+
+# Spotify OAuth scopes
+SPOTIFY_SCOPES = 'playlist-read-private playlist-modify-public playlist-modify-private user-read-private'
+
+
+def get_spotify_auth_url():
+    """Generate Spotify authorization URL."""
+    params = {
+        'client_id': Config.SPOTIFY_CLIENT_ID,
+        'response_type': 'code',
+        'redirect_uri': Config.SPOTIFY_REDIRECT_URI,
+        'scope': SPOTIFY_SCOPES,
+        'show_dialog': 'true'
+    }
+    return 'https://accounts.spotify.com/authorize?' + urllib.parse.urlencode(params)
+
+
+def exchange_code_for_tokens(code):
+    """Exchange authorization code for access and refresh tokens."""
+    auth_header = base64.b64encode(
+        f"{Config.SPOTIFY_CLIENT_ID}:{Config.SPOTIFY_CLIENT_SECRET}".encode()
+    ).decode()
+
+    response = requests.post(
+        'https://accounts.spotify.com/api/token',
+        data={
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': Config.SPOTIFY_REDIRECT_URI
+        },
+        headers={
+            'Authorization': f'Basic {auth_header}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    )
+
+    if response.status_code == 200:
+        return response.json()
+    return None
+
+
+def refresh_spotify_token(refresh_token):
+    """Refresh an expired Spotify access token."""
+    auth_header = base64.b64encode(
+        f"{Config.SPOTIFY_CLIENT_ID}:{Config.SPOTIFY_CLIENT_SECRET}".encode()
+    ).decode()
+
+    response = requests.post(
+        'https://accounts.spotify.com/api/token',
+        data={
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token
+        },
+        headers={
+            'Authorization': f'Basic {auth_header}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    )
+
+    if response.status_code == 200:
+        return response.json()
+    return None
+
+
+def get_user_spotify_client(user_id):
+    """Get a Spotify client for a user with valid access token."""
+    try:
+        profile = supabase.table('profiles').select(
+            'spotify_access_token, spotify_refresh_token, spotify_token_expires'
+        ).eq('id', user_id).single().execute()
+
+        if not profile.data or not profile.data.get('spotify_access_token'):
+            return None
+
+        # Check if token is expired
+        expires_at = profile.data.get('spotify_token_expires')
+        if expires_at:
+            expires_dt = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            if datetime.now(expires_dt.tzinfo) >= expires_dt:
+                # Token expired, refresh it
+                refresh_token = profile.data.get('spotify_refresh_token')
+                if not refresh_token:
+                    return None
+
+                token_data = refresh_spotify_token(refresh_token)
+                if not token_data:
+                    return None
+
+                # Update tokens in database
+                new_expires = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+                update_data = {
+                    'spotify_access_token': token_data['access_token'],
+                    'spotify_token_expires': new_expires.isoformat()
+                }
+                # Spotify may return a new refresh token
+                if 'refresh_token' in token_data:
+                    update_data['spotify_refresh_token'] = token_data['refresh_token']
+
+                supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+
+                return spotipy.Spotify(auth=token_data['access_token'])
+
+        return spotipy.Spotify(auth=profile.data['spotify_access_token'])
+    except Exception as e:
+        print(f"Error getting user Spotify client: {e}")
+        return None
 
 
 def login_required(f):
@@ -546,10 +655,25 @@ def user_profile(username):
     except Exception:
         pass  # Table might not exist yet
 
+    # Check if profile has Spotify linked
+    has_spotify = bool(profile.get('spotify_user_id'))
+    spotify_user_id = profile.get('spotify_user_id') if has_spotify else None
+
+    # Check if current user has Spotify connected (for import/export features)
+    current_user_has_spotify = False
+    if 'user' in session:
+        try:
+            current_profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
+            current_user_has_spotify = bool(current_profile.data and current_profile.data.get('spotify_user_id'))
+        except Exception:
+            pass
+
     return render_template('profile.html', profile=profile, lists=lists,
                           favorite_songs=favorite_songs, favorite_albums=favorite_albums,
                           album_ratings=album_ratings, song_ratings=song_ratings, is_owner=is_owner,
-                          follower_count=follower_count, following_count=following_count, is_following=is_following)
+                          follower_count=follower_count, following_count=following_count, is_following=is_following,
+                          has_spotify=has_spotify, spotify_user_id=spotify_user_id,
+                          current_user_has_spotify=current_user_has_spotify)
 
 
 @app.route('/api/spotify/search/albums')
@@ -1253,6 +1377,362 @@ def get_user_following(user_id):
         return jsonify({'following': following})
     except Exception as e:
         return jsonify({'following': [], 'error': str(e)})
+
+
+# ============== SPOTIFY OAUTH ROUTES ==============
+
+@app.route('/connect/spotify')
+@login_required
+def connect_spotify():
+    """Redirect to Spotify authorization."""
+    return redirect(get_spotify_auth_url())
+
+
+@app.route('/callback/spotify')
+def spotify_callback():
+    """Handle Spotify OAuth callback."""
+    error = request.args.get('error')
+    if error:
+        flash(f'Spotify authorization failed: {error}', 'error')
+        return redirect(url_for('dashboard'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('No authorization code received', 'error')
+        return redirect(url_for('dashboard'))
+
+    if 'user' not in session:
+        flash('Please log in first', 'error')
+        return redirect(url_for('login'))
+
+    # Exchange code for tokens
+    token_data = exchange_code_for_tokens(code)
+    if not token_data:
+        flash('Failed to get Spotify tokens', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Get Spotify user info
+    sp = spotipy.Spotify(auth=token_data['access_token'])
+    try:
+        spotify_user = sp.current_user()
+    except Exception as e:
+        flash(f'Failed to get Spotify profile: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Calculate token expiration
+    expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+
+    # Save to database
+    try:
+        supabase.table('profiles').update({
+            'spotify_user_id': spotify_user['id'],
+            'spotify_display_name': spotify_user.get('display_name', spotify_user['id']),
+            'spotify_access_token': token_data['access_token'],
+            'spotify_refresh_token': token_data['refresh_token'],
+            'spotify_token_expires': expires_at.isoformat()
+        }).eq('id', session['user']['id']).execute()
+
+        flash('Spotify account linked successfully!', 'success')
+    except Exception as e:
+        flash(f'Failed to save Spotify connection: {str(e)}', 'error')
+
+    return redirect(url_for('user_profile', username=session['user']['username']))
+
+
+@app.route('/disconnect/spotify', methods=['POST'])
+@login_required
+def disconnect_spotify():
+    """Disconnect Spotify account."""
+    try:
+        supabase.table('profiles').update({
+            'spotify_user_id': None,
+            'spotify_display_name': None,
+            'spotify_access_token': None,
+            'spotify_refresh_token': None,
+            'spotify_token_expires': None
+        }).eq('id', session['user']['id']).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spotify/connected')
+@login_required
+def check_spotify_connected():
+    """Check if current user has Spotify connected."""
+    try:
+        profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
+        return jsonify({'connected': bool(profile.data and profile.data.get('spotify_user_id'))})
+    except Exception:
+        return jsonify({'connected': False})
+
+
+# ============== SPOTIFY IMPORT/EXPORT ROUTES ==============
+
+@app.route('/api/spotify/playlists')
+@login_required
+def get_spotify_playlists():
+    """Get user's Spotify playlists for import."""
+    sp = get_user_spotify_client(session['user']['id'])
+    if not sp:
+        return jsonify({'error': 'Spotify not connected'}), 401
+
+    try:
+        playlists = []
+        results = sp.current_user_playlists(limit=50)
+
+        while results:
+            for playlist in results['items']:
+                if playlist:
+                    playlists.append({
+                        'id': playlist['id'],
+                        'name': playlist['name'],
+                        'track_count': playlist['tracks']['total'],
+                        'image': playlist['images'][0]['url'] if playlist.get('images') else None,
+                        'owner': playlist['owner']['display_name']
+                    })
+
+            if results['next']:
+                results = sp.next(results)
+            else:
+                break
+
+        return jsonify({'playlists': playlists})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spotify/playlist/<playlist_id>/tracks')
+@login_required
+def get_spotify_playlist_tracks(playlist_id):
+    """Get tracks from a Spotify playlist."""
+    sp = get_user_spotify_client(session['user']['id'])
+    if not sp:
+        return jsonify({'error': 'Spotify not connected'}), 401
+
+    try:
+        tracks = []
+        results = sp.playlist_tracks(playlist_id, limit=100)
+
+        while results:
+            for item in results['items']:
+                track = item.get('track')
+                if track and track.get('id'):
+                    tracks.append({
+                        'id': track['id'],
+                        'name': track['name'],
+                        'artist': ', '.join(a['name'] for a in track['artists']),
+                        'album': track['album']['name'],
+                        'album_art': track['album']['images'][0]['url'] if track['album'].get('images') else None
+                    })
+
+            if results['next']:
+                results = sp.next(results)
+            else:
+                break
+
+        return jsonify({'tracks': tracks})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spotify/import', methods=['POST'])
+@login_required
+def import_spotify_playlist():
+    """Import a Spotify playlist to Jukebox."""
+    sp = get_user_spotify_client(session['user']['id'])
+    if not sp:
+        return jsonify({'error': 'Spotify not connected'}), 401
+
+    data = request.json
+    playlist_id = data.get('playlist_id')
+    target_list_id = data.get('list_id')  # None means create new
+    new_list_title = data.get('new_list_title')
+
+    if not playlist_id:
+        return jsonify({'error': 'Playlist ID required'}), 400
+
+    try:
+        # Get playlist info and tracks
+        playlist_info = sp.playlist(playlist_id)
+        tracks = []
+        results = sp.playlist_tracks(playlist_id, limit=100)
+
+        while results:
+            for item in results['items']:
+                track = item.get('track')
+                if track and track.get('id'):
+                    tracks.append({
+                        'spotify_track_id': track['id'],
+                        'track_name': track['name'],
+                        'artist_name': ', '.join(a['name'] for a in track['artists']),
+                        'album_name': track['album']['name'],
+                        'album_art_url': track['album']['images'][0]['url'] if track['album'].get('images') else None
+                    })
+
+            if results['next']:
+                results = sp.next(results)
+            else:
+                break
+
+        if target_list_id:
+            # Add to existing list
+            list_result = supabase.table('lists').select('id').eq('id', target_list_id).eq('user_id', session['user']['id']).single().execute()
+            if not list_result.data:
+                return jsonify({'error': 'List not found or access denied'}), 403
+
+            # Get current max position
+            pos_result = supabase.table('list_items').select('position').eq('list_id', target_list_id).order('position', desc=True).limit(1).execute()
+            next_position = (pos_result.data[0]['position'] + 1) if pos_result.data else 1
+
+            # Add tracks
+            for i, track in enumerate(tracks):
+                supabase.table('list_items').insert({
+                    'list_id': target_list_id,
+                    'position': next_position + i,
+                    **track
+                }).execute()
+
+            return jsonify({'success': True, 'list_id': target_list_id, 'tracks_added': len(tracks)})
+        else:
+            # Create new list
+            title = new_list_title or playlist_info['name']
+            list_result = supabase.table('lists').insert({
+                'user_id': session['user']['id'],
+                'title': title,
+                'description': f"Imported from Spotify: {playlist_info['name']}",
+                'is_ranked': True,
+                'is_public': False
+            }).execute()
+
+            if not list_result.data:
+                return jsonify({'error': 'Failed to create list'}), 500
+
+            new_list_id = list_result.data[0]['id']
+
+            # Add tracks
+            for i, track in enumerate(tracks):
+                supabase.table('list_items').insert({
+                    'list_id': new_list_id,
+                    'position': i + 1,
+                    **track
+                }).execute()
+
+            return jsonify({'success': True, 'list_id': new_list_id, 'tracks_added': len(tracks)})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spotify/export', methods=['POST'])
+@login_required
+def export_to_spotify():
+    """Export a Jukebox list to Spotify."""
+    sp = get_user_spotify_client(session['user']['id'])
+    if not sp:
+        return jsonify({'error': 'Spotify not connected'}), 401
+
+    data = request.json
+    list_id = data.get('list_id')
+    target_playlist_id = data.get('playlist_id')  # None means create new
+    new_playlist_name = data.get('new_playlist_name')
+
+    if not list_id:
+        return jsonify({'error': 'List ID required'}), 400
+
+    try:
+        # Get list and items
+        list_result = supabase.table('lists').select('*').eq('id', list_id).single().execute()
+        if not list_result.data:
+            return jsonify({'error': 'List not found'}), 404
+
+        lst = list_result.data
+
+        # Check access - must be owner or list must be public
+        is_owner = session['user']['id'] == lst['user_id']
+        if not lst['is_public'] and not is_owner:
+            return jsonify({'error': 'Access denied'}), 403
+
+        items_result = supabase.table('list_items').select('spotify_track_id').eq('list_id', list_id).order('position').execute()
+        track_ids = [item['spotify_track_id'] for item in (items_result.data or []) if item.get('spotify_track_id')]
+
+        if not track_ids:
+            return jsonify({'error': 'No tracks to export'}), 400
+
+        # Get current user's Spotify ID
+        spotify_user = sp.current_user()
+        spotify_user_id = spotify_user['id']
+
+        if target_playlist_id:
+            # Update existing playlist - replace all tracks
+            sp.playlist_replace_items(target_playlist_id, [])
+
+            # Add tracks in batches of 100
+            for i in range(0, len(track_ids), 100):
+                batch = [f'spotify:track:{tid}' for tid in track_ids[i:i+100]]
+                sp.playlist_add_items(target_playlist_id, batch)
+
+            return jsonify({'success': True, 'playlist_id': target_playlist_id, 'tracks_exported': len(track_ids)})
+        else:
+            # Create new playlist
+            name = new_playlist_name or lst['title']
+            playlist = sp.user_playlist_create(
+                spotify_user_id,
+                name,
+                public=False,
+                description=f"Exported from Jukebox: {lst['title']}"
+            )
+
+            # Add tracks in batches of 100
+            for i in range(0, len(track_ids), 100):
+                batch = [f'spotify:track:{tid}' for tid in track_ids[i:i+100]]
+                sp.playlist_add_items(playlist['id'], batch)
+
+            return jsonify({
+                'success': True,
+                'playlist_id': playlist['id'],
+                'playlist_url': playlist['external_urls']['spotify'],
+                'tracks_exported': len(track_ids)
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spotify/my-playlists')
+@login_required
+def get_my_spotify_playlists():
+    """Get only playlists owned by the current user (for export target selection)."""
+    sp = get_user_spotify_client(session['user']['id'])
+    if not sp:
+        return jsonify({'error': 'Spotify not connected'}), 401
+
+    try:
+        spotify_user = sp.current_user()
+        spotify_user_id = spotify_user['id']
+
+        playlists = []
+        results = sp.current_user_playlists(limit=50)
+
+        while results:
+            for playlist in results['items']:
+                if playlist and playlist['owner']['id'] == spotify_user_id:
+                    playlists.append({
+                        'id': playlist['id'],
+                        'name': playlist['name'],
+                        'track_count': playlist['tracks']['total'],
+                        'image': playlist['images'][0]['url'] if playlist.get('images') else None
+                    })
+
+            if results['next']:
+                results = sp.next(results)
+            else:
+                break
+
+        return jsonify({'playlists': playlists})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

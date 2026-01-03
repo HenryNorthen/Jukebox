@@ -4,7 +4,10 @@
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">My Lists</h1>
+    <div>
+        <h1 class="text-2xl font-bold">My Lists</h1>
+        <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-sm text-accent hover:underline">View my profile</a>
+    </div>
     <a href="{{ url_for('create_list') }}" class="btn-primary text-sm">+ New List</a>
 </div>
 

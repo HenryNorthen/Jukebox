@@ -128,6 +128,7 @@
             <div class="flex items-center gap-5">
                 <a href="{{ url_for('search_users') }}" class="text-muted hover:text-white transition text-sm">Find Users</a>
                 {% if session.user %}
+                    <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-muted hover:text-white transition text-sm">Profile</a>
                     <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm">My Lists</a>
                     <a href="{{ url_for('create_list') }}" class="btn-primary text-xs">+ New List</a>
                     <a href="{{ url_for('logout') }}" class="text-muted hover:text-white transition text-sm">Logout</a>

@@ -16,8 +16,8 @@
                         elevated: '#242c34',
                         border: '#3a3f47',
                         muted: '#99aabb',
-                        accent: '#e07840',
-                        accentHover: '#f08a50',
+                        accent: '#22d3ee',
+                        accentHover: '#67e8f9',
                         danger: '#ef4444',
                     }
                 }
@@ -66,7 +66,7 @@
             top: 8px;
             left: 8px;
             background: rgba(0, 0, 0, 0.85);
-            color: #e07840;
+            color: #22d3ee;
             font-size: 0.75rem;
             font-weight: 700;
             padding: 3px 8px;
@@ -74,15 +74,15 @@
         }
 
         .btn-primary {
-            background: #e07840;
-            color: #fff;
+            background: #22d3ee;
+            color: #14181c;
             font-weight: 600;
             padding: 0.5rem 1.25rem;
             border-radius: 6px;
             font-size: 0.875rem;
             transition: background 0.15s;
         }
-        .btn-primary:hover { background: #f08a50; }
+        .btn-primary:hover { background: #67e8f9; }
 
         .btn-secondary {
             background: transparent;
@@ -110,7 +110,7 @@
         }
         .input-field:focus {
             outline: none;
-            border-color: #e07840;
+            border-color: #22d3ee;
         }
         .input-field::placeholder { color: #667788; }
 
@@ -143,7 +143,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="mb-4 px-4 py-3 rounded-lg text-sm {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-orange-900/50 text-orange-300 border border-orange-800{% endif %}">
+                    <div class="mb-4 px-4 py-3 rounded-lg text-sm {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-cyan-900/50 text-cyan-300 border border-cyan-800{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}

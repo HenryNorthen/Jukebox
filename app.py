@@ -159,16 +159,21 @@ def create_list():
         is_ranked = request.form.get('is_ranked') == 'on'
         is_public = request.form.get('is_public') == 'on'
 
-        result = supabase.table('lists').insert({
-            'user_id': session['user']['id'],
-            'title': title,
-            'description': description,
-            'is_ranked': is_ranked,
-            'is_public': is_public
-        }).execute()
+        try:
+            result = supabase.table('lists').insert({
+                'user_id': session['user']['id'],
+                'title': title,
+                'description': description,
+                'is_ranked': is_ranked,
+                'is_public': is_public
+            }).execute()
 
-        if result.data:
-            return redirect(url_for('edit_list', list_id=result.data[0]['id']))
+            if result.data:
+                return redirect(url_for('edit_list', list_id=result.data[0]['id']))
+            else:
+                flash('Failed to create list', 'error')
+        except Exception as e:
+            flash(f'Error creating list: {str(e)}', 'error')
 
     return render_template('create_list.html')
 

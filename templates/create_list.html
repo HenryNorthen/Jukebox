@@ -3,40 +3,37 @@
 {% block title %}New List - Jukebox{% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto bg-cardbg rounded-lg shadow-lg p-8 border-t-4 border-dark">
-    <h1 class="text-2xl font-bold text-dark mb-6">Create New List</h1>
+<div class="max-w-lg mx-auto">
+    <h1 class="text-2xl font-bold text-white mb-6">Create New List</h1>
 
-    <form method="POST" class="space-y-4">
+    <form method="POST" class="card p-6 space-y-5">
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Title</label>
+            <label class="block text-sm font-medium text-muted mb-2">Title</label>
             <input type="text" name="title" required maxlength="100"
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
+                   class="input-field"
                    placeholder="My Top 50 Songs of 2024">
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Description (optional)</label>
+            <label class="block text-sm font-medium text-muted mb-2">Description (optional)</label>
             <textarea name="description" rows="3"
-                      class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
+                      class="input-field"
                       placeholder="What's this list about?"></textarea>
         </div>
 
-        <div class="flex items-center space-x-6">
+        <div class="flex flex-col gap-3">
             <label class="flex items-center cursor-pointer">
-                <input type="checkbox" name="is_ranked" checked class="mr-2 accent-dark">
-                <span class="text-sm text-dark">Ranked (numbered 1, 2, 3...)</span>
+                <input type="checkbox" name="is_ranked" checked class="mr-3 w-4 h-4 accent-accent">
+                <span class="text-sm text-white">Ranked (numbered 1, 2, 3...)</span>
+            </label>
+            <label class="flex items-center cursor-pointer">
+                <input type="checkbox" name="is_public" checked class="mr-3 w-4 h-4 accent-accent">
+                <span class="text-sm text-white">Public (visible to everyone)</span>
             </label>
         </div>
 
-        <div class="flex items-center space-x-6">
-            <label class="flex items-center cursor-pointer">
-                <input type="checkbox" name="is_public" checked class="mr-2 accent-dark">
-                <span class="text-sm text-dark">Public (visible to everyone)</span>
-            </label>
-        </div>
-
-        <div class="pt-4">
-            <button type="submit" class="w-full bg-dark text-khaki py-2 rounded font-semibold hover:bg-forest transition">
+        <div class="pt-2">
+            <button type="submit" class="btn-primary w-full py-3">
                 Create List
             </button>
         </div>

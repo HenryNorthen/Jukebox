@@ -45,6 +45,21 @@
     </div>
 </div>
 
+<!-- Swap Modal -->
+<div id="swap-modal" class="fixed inset-0 bg-dark bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-cardbg rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-dark">Swap Song</h3>
+            <button onclick="closeSwapModal()" class="text-forest hover:text-dark text-xl">&times;</button>
+        </div>
+        <input type="text" id="swap-search-input"
+               class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark mb-3"
+               placeholder="Search for the correct version...">
+        <div id="swap-search-results" class="max-h-64 overflow-y-auto">
+        </div>
+    </div>
+</div>
+
 <!-- Current Items -->
 <div class="bg-cardbg rounded-lg shadow-md p-6">
     <h2 class="text-lg font-bold text-dark mb-4">
@@ -75,8 +90,12 @@
                     <p class="text-sm text-forest truncate">{{ item.artist_name }}</p>
                 </div>
 
+                <button onclick="swapItem('{{ item.id }}', '{{ item.track_name }}')"
+                        class="text-forest hover:text-dark px-2 py-1 font-medium transition text-sm">
+                    Swap
+                </button>
                 <button onclick="removeItem('{{ item.id }}')"
-                        class="text-brown hover:text-red-600 px-3 py-1 font-medium transition">
+                        class="text-brown hover:text-red-600 px-2 py-1 font-medium transition text-sm">
                     Remove
                 </button>
             </div>
@@ -293,8 +312,12 @@ function addItemToDOM(item) {
                 <p class="font-medium text-dark truncate">${item.track_name}</p>
                 <p class="text-sm text-forest truncate">${item.artist_name}</p>
             </div>
+            <button onclick="swapItem('${item.id}', '${item.track_name.replace(/'/g, "\\'")}')"
+                    class="text-forest hover:text-dark px-2 py-1 font-medium transition text-sm">
+                Swap
+            </button>
             <button onclick="removeItem('${item.id}')"
-                    class="text-brown hover:text-red-600 px-3 py-1 font-medium transition">
+                    class="text-brown hover:text-red-600 px-2 py-1 font-medium transition text-sm">
                 Remove
             </button>
         </div>
@@ -342,6 +365,97 @@ function updateItemCount(delta) {
     const current = parseInt(itemCount.textContent) || 0;
     itemCount.textContent = current + delta;
 }
+
+// Swap functionality
+const swapModal = document.getElementById('swap-modal');
+const swapSearchInput = document.getElementById('swap-search-input');
+const swapSearchResults = document.getElementById('swap-search-results');
+let currentSwapItemId = null;
+let swapSearchTimeout;
+
+function swapItem(itemId, trackName) {
+    currentSwapItemId = itemId;
+    swapSearchInput.value = trackName;
+    swapSearchResults.innerHTML = '';
+    swapModal.classList.remove('hidden');
+    swapSearchInput.focus();
+    // Trigger search immediately
+    doSwapSearch(trackName);
+}
+
+function closeSwapModal() {
+    swapModal.classList.add('hidden');
+    currentSwapItemId = null;
+    swapSearchInput.value = '';
+    swapSearchResults.innerHTML = '';
+}
+
+function doSwapSearch(query) {
+    if (query.length < 2) {
+        swapSearchResults.innerHTML = '';
+        return;
+    }
+
+    fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.tracks && data.tracks.length > 0) {
+                swapSearchResults.innerHTML = data.tracks.map(track => `
+                    <div class="flex items-center gap-3 p-3 hover:bg-khakilight cursor-pointer transition border-b border-khaki"
+                         onclick="selectSwapTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
+                        <img src="${track.album_art || ''}" alt="" class="w-10 h-10 rounded object-cover">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-dark truncate">${track.name}</p>
+                            <p class="text-sm text-forest truncate">${track.artist}</p>
+                            <p class="text-xs text-brown truncate">${track.album}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                swapSearchResults.innerHTML = '<p class="p-4 text-forest">No results found</p>';
+            }
+        });
+}
+
+swapSearchInput.addEventListener('input', function() {
+    clearTimeout(swapSearchTimeout);
+    swapSearchTimeout = setTimeout(() => doSwapSearch(this.value.trim()), 300);
+});
+
+function selectSwapTrack(track) {
+    if (!currentSwapItemId) return;
+
+    // Update the item in the database
+    fetch(`/api/list/${listId}/update/${currentSwapItemId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            track_id: track.id,
+            track_name: track.name,
+            artist_name: track.artist,
+            album_name: track.album,
+            album_art_url: track.album_art
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Update the DOM
+            const row = document.querySelector(`.item-row[data-id="${currentSwapItemId}"]`);
+            if (row) {
+                row.querySelector('img').src = track.album_art || '';
+                row.querySelector('.font-medium').textContent = track.name;
+                row.querySelector('.text-forest').textContent = track.artist;
+            }
+            closeSwapModal();
+        }
+    });
+}
+
+// Close modal on background click
+swapModal.addEventListener('click', function(e) {
+    if (e.target === swapModal) closeSwapModal();
+});
 
 </script>
 {% endblock %}

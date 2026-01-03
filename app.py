@@ -265,6 +265,29 @@ def remove_from_list(list_id, item_id):
     return jsonify({'success': True})
 
 
+@app.route('/api/list/<list_id>/update/<item_id>', methods=['POST'])
+@login_required
+def update_list_item(list_id, item_id):
+    """Update a track in a list (swap for a different version)."""
+    # Verify ownership
+    list_result = supabase.table('lists').select('id').eq('id', list_id).eq('user_id', session['user']['id']).single().execute()
+    if not list_result.data:
+        return jsonify({'error': 'Access denied'}), 403
+
+    data = request.json
+
+    # Update the item
+    supabase.table('list_items').update({
+        'spotify_track_id': data.get('track_id'),
+        'track_name': data.get('track_name'),
+        'artist_name': data.get('artist_name'),
+        'album_name': data.get('album_name'),
+        'album_art_url': data.get('album_art_url')
+    }).eq('id', item_id).execute()
+
+    return jsonify({'success': True})
+
+
 @app.route('/api/list/<list_id>/reorder', methods=['POST'])
 @login_required
 def reorder_list(list_id):

@@ -87,9 +87,12 @@
 
 <!-- Current Items -->
 <div class="card p-4">
-    <h2 class="font-semibold mb-3">
-        Songs <span class="text-muted font-normal">(<span id="item-count">{{ items|length }}</span>)</span>
-    </h2>
+    <div class="flex justify-between items-center mb-3">
+        <h2 class="font-semibold">
+            Songs <span class="text-muted font-normal">(<span id="item-count">{{ items|length }}</span>)</span>
+        </h2>
+        <span class="text-xs text-muted md:hidden">Hold to drag</span>
+    </div>
 
     <div id="items-container">
         {% if items %}
@@ -112,8 +115,8 @@
                     <p class="text-xs text-muted truncate">{{ item.artist_name }}</p>
                 </div>
 
-                <button onclick="swapItem('{{ item.id }}', '{{ item.track_name }}')" class="text-muted hover:text-accent text-xs">Swap</button>
-                <button onclick="removeItem('{{ item.id }}')" class="text-muted hover:text-danger text-xs">Remove</button>
+                <button onclick="swapItem('{{ item.id }}', '{{ item.track_name }}')" class="text-muted hover:text-accent text-xs whitespace-nowrap">Swap</button>
+                <button onclick="removeItem('{{ item.id }}')" class="text-muted hover:text-danger text-xs whitespace-nowrap">✕</button>
             </div>
             {% endfor %}
         {% else %}
@@ -209,34 +212,33 @@ bulkAddBtn.addEventListener('click', async () => {
 // Detect if device is touch-only (mobile)
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-// Only enable drag-and-drop on desktop
-let sortable = null;
-if (!isTouchDevice) {
-    sortable = new Sortable(itemsContainer, {
-        animation: 150,
-        handle: '.drag-handle',
-        ghostClass: 'opacity-50',
-        onEnd: function(evt) {
-            const rows = itemsContainer.querySelectorAll('.item-row');
-            const newOrder = [];
-            rows.forEach((row, index) => {
-                const itemId = row.dataset.id;
-                const newPosition = index + 1;
-                newOrder.push({ item_id: itemId, position: newPosition });
-                const posDisplay = row.querySelector('.position-display');
-                if (posDisplay) posDisplay.textContent = newPosition;
-            });
-            fetch(`/api/list/${listId}/reorder-all`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order: newOrder })
-            });
-        }
-    });
-} else {
-    // Hide drag handles on mobile
-    document.querySelectorAll('.drag-handle').forEach(el => el.style.display = 'none');
-}
+// Enable drag-and-drop on both desktop and mobile
+// On mobile, use delay (long-press) to initiate drag so scrolling still works
+let sortable = new Sortable(itemsContainer, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'opacity-50',
+    // On touch devices, require 300ms hold before drag starts (allows scrolling)
+    delay: isTouchDevice ? 300 : 0,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 5,
+    onEnd: function(evt) {
+        const rows = itemsContainer.querySelectorAll('.item-row');
+        const newOrder = [];
+        rows.forEach((row, index) => {
+            const itemId = row.dataset.id;
+            const newPosition = index + 1;
+            newOrder.push({ item_id: itemId, position: newPosition });
+            const posDisplay = row.querySelector('.position-display');
+            if (posDisplay) posDisplay.textContent = newPosition;
+        });
+        fetch(`/api/list/${listId}/reorder-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: newOrder })
+        });
+    }
+});
 
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
@@ -290,8 +292,8 @@ function addItemToDOM(item) {
                 <p class="text-sm font-medium truncate">${item.track_name}</p>
                 <p class="text-xs text-muted truncate">${item.artist_name}</p>
             </div>
-            <button onclick="swapItem('${item.id}', '${item.track_name.replace(/'/g, "\\'")}')" class="text-muted hover:text-accent text-xs">Swap</button>
-            <button onclick="removeItem('${item.id}')" class="text-muted hover:text-danger text-xs">Remove</button>
+            <button onclick="swapItem('${item.id}', '${item.track_name.replace(/'/g, "\\'")}')" class="text-muted hover:text-accent text-xs whitespace-nowrap">Swap</button>
+            <button onclick="removeItem('${item.id}')" class="text-muted hover:text-danger text-xs whitespace-nowrap">✕</button>
         </div>
     `;
     itemsContainer.insertAdjacentHTML('beforeend', html);

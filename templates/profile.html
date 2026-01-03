@@ -163,7 +163,8 @@
                  data-type="album"
                  data-name="{{ rating.album_name }}"
                  data-artist="{{ rating.artist_name }}"
-                 data-art="{{ rating.album_art_url }}">
+                 data-art="{{ rating.album_art_url }}"
+                 data-rating="{{ rating.rating }}">
                 {% if rating.album_art_url %}
                 <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
                 {% else %}
@@ -172,9 +173,22 @@
                 </div>
                 {% endif %}
                 <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                    <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
-                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                <!-- Desktop hover overlay with re-rate option -->
+                <div class="absolute inset-0 bg-black/80 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex flex-col justify-end p-3 hover-overlay"
+                     data-type="album" data-name="{{ rating.album_name }}" data-artist="{{ rating.artist_name }}" data-art="{{ rating.album_art_url }}">
+                    <div class="hover-stars flex gap-0.5 mb-2" data-current-rating="{{ rating.rating }}" onmouseleave="resetHoverStars(this)" onclick="event.stopPropagation()">
+                        {% for i in range(5) %}
+                        <svg class="w-5 h-5 cursor-pointer hover-star" viewBox="0 0 24 24" data-index="{{ i }}"
+                             onmouseenter="previewHoverStar(this, {{ i + 1 }})"
+                             onclick="event.stopPropagation(); setHoverRating(this, {{ i + 1 }})">
+                            <path class="star-bg-path" fill="#3a3f47" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            <path class="star-fill-path" fill="#22d3ee" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" style="opacity: {{ 1 if i < rating.rating else 0 }};"/>
+                        </svg>
+                        {% endfor %}
+                        <span class="hover-rating-text text-xs text-muted ml-1">{{ rating.rating }}★</span>
+                    </div>
+                    <p class="text-white font-medium text-sm truncate pointer-events-none">{{ rating.album_name }}</p>
+                    <p class="text-muted text-xs truncate pointer-events-none">{{ rating.artist_name }}</p>
                 </div>
             </div>
             {% endfor %}
@@ -186,7 +200,8 @@
                  data-type="album"
                  data-name="{{ rating.album_name }}"
                  data-artist="{{ rating.artist_name }}"
-                 data-art="{{ rating.album_art_url }}">
+                 data-art="{{ rating.album_art_url }}"
+                 data-rating="{{ rating.rating }}">
                 {% if rating.album_art_url %}
                 <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
                 {% else %}
@@ -195,9 +210,22 @@
                 </div>
                 {% endif %}
                 <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                    <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
-                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                <!-- Desktop hover overlay with re-rate option -->
+                <div class="absolute inset-0 bg-black/80 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex flex-col justify-end p-3 hover-overlay"
+                     data-type="album" data-name="{{ rating.album_name }}" data-artist="{{ rating.artist_name }}" data-art="{{ rating.album_art_url }}">
+                    <div class="hover-stars flex gap-0.5 mb-2" data-current-rating="{{ rating.rating }}" onmouseleave="resetHoverStars(this)" onclick="event.stopPropagation()">
+                        {% for i in range(5) %}
+                        <svg class="w-5 h-5 cursor-pointer hover-star" viewBox="0 0 24 24" data-index="{{ i }}"
+                             onmouseenter="previewHoverStar(this, {{ i + 1 }})"
+                             onclick="event.stopPropagation(); setHoverRating(this, {{ i + 1 }})">
+                            <path class="star-bg-path" fill="#3a3f47" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            <path class="star-fill-path" fill="#22d3ee" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" style="opacity: {{ 1 if i < rating.rating else 0 }};"/>
+                        </svg>
+                        {% endfor %}
+                        <span class="hover-rating-text text-xs text-muted ml-1">{{ rating.rating }}★</span>
+                    </div>
+                    <p class="text-white font-medium text-sm truncate pointer-events-none">{{ rating.album_name }}</p>
+                    <p class="text-muted text-xs truncate pointer-events-none">{{ rating.artist_name }}</p>
                 </div>
             </div>
             {% endfor %}
@@ -219,7 +247,8 @@
                  data-type="song"
                  data-name="{{ rating.track_name }}"
                  data-artist="{{ rating.artist_name }}"
-                 data-art="{{ rating.album_art_url }}">
+                 data-art="{{ rating.album_art_url }}"
+                 data-rating="{{ rating.rating }}">
                 {% if rating.album_art_url %}
                 <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
                 {% else %}
@@ -228,9 +257,22 @@
                 </div>
                 {% endif %}
                 <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                    <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
-                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                <!-- Desktop hover overlay with re-rate option -->
+                <div class="absolute inset-0 bg-black/80 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex flex-col justify-end p-3 hover-overlay"
+                     data-type="song" data-name="{{ rating.track_name }}" data-artist="{{ rating.artist_name }}" data-art="{{ rating.album_art_url }}">
+                    <div class="hover-stars flex gap-0.5 mb-2" data-current-rating="{{ rating.rating }}" onmouseleave="resetHoverStars(this)" onclick="event.stopPropagation()">
+                        {% for i in range(5) %}
+                        <svg class="w-5 h-5 cursor-pointer hover-star" viewBox="0 0 24 24" data-index="{{ i }}"
+                             onmouseenter="previewHoverStar(this, {{ i + 1 }})"
+                             onclick="event.stopPropagation(); setHoverRating(this, {{ i + 1 }})">
+                            <path class="star-bg-path" fill="#3a3f47" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            <path class="star-fill-path" fill="#22d3ee" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" style="opacity: {{ 1 if i < rating.rating else 0 }};"/>
+                        </svg>
+                        {% endfor %}
+                        <span class="hover-rating-text text-xs text-muted ml-1">{{ rating.rating }}★</span>
+                    </div>
+                    <p class="text-white font-medium text-sm truncate pointer-events-none">{{ rating.track_name }}</p>
+                    <p class="text-muted text-xs truncate pointer-events-none">{{ rating.artist_name }}</p>
                 </div>
             </div>
             {% endfor %}
@@ -242,7 +284,8 @@
                  data-type="song"
                  data-name="{{ rating.track_name }}"
                  data-artist="{{ rating.artist_name }}"
-                 data-art="{{ rating.album_art_url }}">
+                 data-art="{{ rating.album_art_url }}"
+                 data-rating="{{ rating.rating }}">
                 {% if rating.album_art_url %}
                 <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
                 {% else %}
@@ -251,9 +294,22 @@
                 </div>
                 {% endif %}
                 <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
-                <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                    <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
-                    <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+                <!-- Desktop hover overlay with re-rate option -->
+                <div class="absolute inset-0 bg-black/80 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex flex-col justify-end p-3 hover-overlay"
+                     data-type="song" data-name="{{ rating.track_name }}" data-artist="{{ rating.artist_name }}" data-art="{{ rating.album_art_url }}">
+                    <div class="hover-stars flex gap-0.5 mb-2" data-current-rating="{{ rating.rating }}" onmouseleave="resetHoverStars(this)" onclick="event.stopPropagation()">
+                        {% for i in range(5) %}
+                        <svg class="w-5 h-5 cursor-pointer hover-star" viewBox="0 0 24 24" data-index="{{ i }}"
+                             onmouseenter="previewHoverStar(this, {{ i + 1 }})"
+                             onclick="event.stopPropagation(); setHoverRating(this, {{ i + 1 }})">
+                            <path class="star-bg-path" fill="#3a3f47" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            <path class="star-fill-path" fill="#22d3ee" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" style="opacity: {{ 1 if i < rating.rating else 0 }};"/>
+                        </svg>
+                        {% endfor %}
+                        <span class="hover-rating-text text-xs text-muted ml-1">{{ rating.rating }}★</span>
+                    </div>
+                    <p class="text-white font-medium text-sm truncate pointer-events-none">{{ rating.track_name }}</p>
+                    <p class="text-muted text-xs truncate pointer-events-none">{{ rating.artist_name }}</p>
                 </div>
             </div>
             {% endfor %}
@@ -926,6 +982,103 @@ function updateDetailStarDisplay(value) {
 document.getElementById('detail-modal').addEventListener('click', function(e) {
     if (e.target === this) closeDetailModal();
 });
+
+// ============== HOVER RATING FUNCTIONS (desktop only) ==============
+function previewHoverStar(starEl, value) {
+    const starsContainer = starEl.closest('.hover-stars');
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        if (value >= index + 1) {
+            fillPath.style.opacity = '1';
+        } else {
+            fillPath.style.opacity = '0';
+        }
+    });
+
+    if (ratingText) {
+        ratingText.textContent = `${value}★`;
+    }
+}
+
+function resetHoverStars(starsContainer) {
+    const currentRating = parseInt(starsContainer.dataset.currentRating) || 0;
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        if (currentRating >= index + 1) {
+            fillPath.style.opacity = '1';
+        } else {
+            fillPath.style.opacity = '0';
+        }
+    });
+
+    if (currentRating > 0 && ratingText) {
+        ratingText.textContent = `${currentRating}★`;
+    } else if (ratingText) {
+        ratingText.textContent = '';
+    }
+}
+
+function setHoverRating(starEl, value) {
+    if (!isLoggedIn) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const starsContainer = starEl.closest('.hover-stars');
+    const overlay = starEl.closest('.hover-overlay');
+    const name = overlay.dataset.name;
+    const artist = overlay.dataset.artist;
+    const art = overlay.dataset.art;
+    const type = overlay.dataset.type;
+
+    // Update display immediately
+    starsContainer.dataset.currentRating = value;
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        fillPath.style.opacity = value >= index + 1 ? '1' : '0';
+    });
+    if (ratingText) ratingText.textContent = `${value}★`;
+
+    // Also update the rank badge on the tile
+    const tile = overlay.closest('.album-tile');
+    const rankBadge = tile.querySelector('.rank-badge');
+    if (rankBadge) rankBadge.textContent = `★ ${value}`;
+
+    // Save to server
+    const endpoint = type === 'album' ? '/api/album/rating' : '/api/song/rating';
+    const body = type === 'album'
+        ? { album_name: name, artist_name: artist, album_art_url: art, rating: value }
+        : { track_name: name, artist_name: artist, album_art_url: art, rating: value };
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Rated ${value} stars`);
+        }
+    });
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-accent text-base px-4 py-2 rounded-lg font-medium text-sm z-50';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
 
 // ============== SPOTIFY IMPORT/EXPORT FUNCTIONS ==============
 let selectedSpotifyPlaylist = null;

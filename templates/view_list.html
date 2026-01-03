@@ -4,9 +4,35 @@
 
 {% block content %}
 <div class="mb-6">
+    <!-- Mobile: Buttons on top row -->
+    <div class="flex flex-wrap gap-2 mb-3 md:hidden">
+        <!-- Like button -->
+        {% if not is_owner %}
+        <button id="like-btn-mobile" onclick="toggleLike()" class="like-btn flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-border hover:border-accent transition">
+            <span class="like-icon text-lg">♡</span>
+            <span class="like-count">0</span>
+        </button>
+        {% else %}
+        <span class="text-muted text-sm flex items-center gap-1">
+            <span class="text-accent">♥</span> <span class="like-count">0</span> likes
+        </span>
+        {% endif %}
+        {% if session.user %}
+        <button onclick="duplicateList()" class="btn-secondary text-xs">Copy</button>
+        <button onclick="openExportSpotifyModal()" class="btn-spotify text-xs">
+            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+            Export
+        </button>
+        {% endif %}
+        {% if is_owner %}
+        <a href="{{ url_for('edit_list', list_id=list.id) }}" class="btn-primary text-xs">Edit List</a>
+        {% endif %}
+    </div>
+
+    <!-- Desktop: Standard layout with buttons on right -->
     <div class="flex justify-between items-start gap-4">
-        <div>
-            <h1 class="text-2xl font-bold">{{ list.title }}</h1>
+        <div class="min-w-0 flex-1">
+            <h1 class="text-xl md:text-2xl font-bold">{{ list.title }}</h1>
             <p class="text-sm text-muted mt-1">
                 by <a href="{{ url_for('user_profile', username=list.profiles.username) }}" class="text-accent hover:underline">{{ list.profiles.username if list.profiles else 'Unknown' }}</a>
                 <span class="mx-1">·</span>
@@ -16,16 +42,17 @@
                 {{ list.created_at[:10] }}
             </p>
         </div>
-        <div class="flex gap-2 flex-shrink-0 items-center">
+        <!-- Desktop buttons -->
+        <div class="hidden md:flex gap-2 flex-shrink-0 items-center">
             <!-- Like button -->
             {% if not is_owner %}
             <button id="like-btn" onclick="toggleLike()" class="like-btn flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-border hover:border-accent transition">
-                <span id="like-icon" class="text-lg">♡</span>
-                <span id="like-count">0</span>
+                <span class="like-icon text-lg">♡</span>
+                <span class="like-count">0</span>
             </button>
             {% else %}
             <span id="like-count-display" class="text-muted text-sm flex items-center gap-1">
-                <span class="text-accent">♥</span> <span id="like-count">0</span> likes
+                <span class="text-accent">♥</span> <span class="like-count">0</span> likes
             </span>
             {% endif %}
             {% if session.user %}
@@ -78,10 +105,27 @@
             </button>
             {% endif %}
 
-            <!-- Hover overlay -->
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
-                <p class="text-white font-medium text-sm truncate">{{ item.track_name }}</p>
-                <p class="text-muted text-xs truncate">{{ item.artist_name }}</p>
+            <!-- Hover overlay (desktop only) -->
+            <div class="absolute inset-0 bg-black/80 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex flex-col justify-end p-3 hover-overlay"
+                 data-type="song"
+                 data-name="{{ item.track_name }}"
+                 data-artist="{{ item.artist_name }}"
+                 data-album="{{ item.album_name }}"
+                 data-art="{{ item.album_art_url }}">
+                <!-- Hover rating stars -->
+                <div class="hover-stars flex gap-0.5 mb-2" onmouseleave="resetHoverStars(this)" onclick="event.stopPropagation()">
+                    {% for i in range(5) %}
+                    <svg class="w-5 h-5 cursor-pointer hover-star" viewBox="0 0 24 24" data-index="{{ i }}"
+                         onmouseenter="previewHoverStar(this, {{ i + 1 }})"
+                         onclick="event.stopPropagation(); setHoverRating(this, {{ i + 1 }})">
+                        <path class="star-bg-path" fill="#3a3f47" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        <path class="star-fill-path" fill="#22d3ee" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" style="opacity: 0;"/>
+                    </svg>
+                    {% endfor %}
+                    <span class="hover-rating-text text-xs text-muted ml-1"></span>
+                </div>
+                <p class="text-white font-medium text-sm truncate pointer-events-none">{{ item.track_name }}</p>
+                <p class="text-muted text-xs truncate pointer-events-none">{{ item.artist_name }}</p>
             </div>
         </div>
         {% endfor %}
@@ -477,18 +521,21 @@ function loadLikeStatus() {
         .then(res => res.json())
         .then(data => {
             userLiked = data.user_liked;
-            document.getElementById('like-count').textContent = data.like_count;
-            const likeBtn = document.getElementById('like-btn');
-            const likeIcon = document.getElementById('like-icon');
-            if (likeBtn) {
+            // Update all like counts (mobile + desktop)
+            document.querySelectorAll('.like-count').forEach(el => {
+                el.textContent = data.like_count;
+            });
+            // Update all like buttons (mobile + desktop)
+            document.querySelectorAll('.like-btn').forEach(likeBtn => {
+                const likeIcon = likeBtn.querySelector('.like-icon');
                 if (userLiked) {
                     likeBtn.classList.add('liked');
-                    likeIcon.textContent = '♥';
+                    if (likeIcon) likeIcon.textContent = '♥';
                 } else {
                     likeBtn.classList.remove('liked');
-                    likeIcon.textContent = '♡';
+                    if (likeIcon) likeIcon.textContent = '♡';
                 }
-            }
+            });
         });
 }
 
@@ -969,6 +1016,146 @@ function updateDetailStarDisplay(value) {
 document.getElementById('detail-modal').addEventListener('click', function(e) {
     if (e.target === this) closeDetailModal();
 });
+
+// ============== HOVER RATING FUNCTIONS (desktop only) ==============
+// Store ratings for each item by name+artist
+const hoverRatingsCache = {};
+
+// Load ratings for all visible items on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.hover-overlay').forEach(overlay => {
+        const name = overlay.dataset.name;
+        const artist = overlay.dataset.artist;
+        const type = overlay.dataset.type;
+        loadHoverRating(overlay, type, name, artist);
+    });
+});
+
+function loadHoverRating(overlay, type, name, artist) {
+    const cacheKey = `${type}:${name}:${artist}`;
+    if (hoverRatingsCache[cacheKey] !== undefined) {
+        displayHoverRating(overlay, hoverRatingsCache[cacheKey]);
+        return;
+    }
+
+    const endpoint = type === 'album'
+        ? `/api/album/rating?album=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`
+        : `/api/song/rating?track=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`;
+
+    fetch(endpoint)
+        .then(res => res.json())
+        .then(data => {
+            const rating = data.rating || 0;
+            hoverRatingsCache[cacheKey] = rating;
+            displayHoverRating(overlay, rating);
+        })
+        .catch(() => {
+            hoverRatingsCache[cacheKey] = 0;
+        });
+}
+
+function displayHoverRating(overlay, rating) {
+    const starsContainer = overlay.querySelector('.hover-stars');
+    if (!starsContainer) return;
+
+    starsContainer.dataset.currentRating = rating;
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        if (rating >= index + 1) {
+            fillPath.style.opacity = '1';
+        } else {
+            fillPath.style.opacity = '0';
+        }
+    });
+
+    if (rating > 0 && ratingText) {
+        ratingText.textContent = `${rating}★`;
+    } else if (ratingText) {
+        ratingText.textContent = '';
+    }
+}
+
+function previewHoverStar(starEl, value) {
+    const starsContainer = starEl.closest('.hover-stars');
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        if (value >= index + 1) {
+            fillPath.style.opacity = '1';
+        } else {
+            fillPath.style.opacity = '0';
+        }
+    });
+
+    if (ratingText) {
+        ratingText.textContent = `${value}★`;
+    }
+}
+
+function resetHoverStars(starsContainer) {
+    const currentRating = parseInt(starsContainer.dataset.currentRating) || 0;
+    const stars = starsContainer.querySelectorAll('.hover-star');
+    const ratingText = starsContainer.querySelector('.hover-rating-text');
+
+    stars.forEach((star, index) => {
+        const fillPath = star.querySelector('.star-fill-path');
+        if (currentRating >= index + 1) {
+            fillPath.style.opacity = '1';
+        } else {
+            fillPath.style.opacity = '0';
+        }
+    });
+
+    if (currentRating > 0 && ratingText) {
+        ratingText.textContent = `${currentRating}★`;
+    } else if (ratingText) {
+        ratingText.textContent = '';
+    }
+}
+
+function setHoverRating(starEl, value) {
+    if (!isLoggedIn) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const starsContainer = starEl.closest('.hover-stars');
+    const overlay = starEl.closest('.hover-overlay');
+    const name = overlay.dataset.name;
+    const artist = overlay.dataset.artist;
+    const art = overlay.dataset.art;
+    const type = overlay.dataset.type;
+
+    // Update display immediately
+    starsContainer.dataset.currentRating = value;
+    displayHoverRating(overlay, value);
+
+    // Save to server
+    const endpoint = type === 'album' ? '/api/album/rating' : '/api/song/rating';
+    const body = type === 'album'
+        ? { album_name: name, artist_name: artist, album_art_url: art, rating: value }
+        : { track_name: name, artist_name: artist, album_art_url: art, rating: value };
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Update cache
+            const cacheKey = `${type}:${name}:${artist}`;
+            hoverRatingsCache[cacheKey] = value;
+            showToast(`Rated ${value} stars`);
+        }
+    });
+}
 
 // ============== SPOTIFY EXPORT FUNCTIONS ==============
 let spotifyPlaylists = [];

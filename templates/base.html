@@ -135,9 +135,9 @@
             <!-- Desktop nav -->
             <div class="hidden md:flex items-center gap-5">
                 {% if session.user %}
-                    <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-muted hover:text-white transition text-sm">Profile</a>
-                    <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm">My Lists</a>
                     <a href="{{ url_for('create_list') }}" class="btn-primary text-xs">+ New List</a>
+                    <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm">My Lists</a>
+                    <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-muted hover:text-white transition text-sm">Profile</a>
                     <a href="{{ url_for('logout') }}" class="text-muted hover:text-white transition text-sm">Logout</a>
                 {% else %}
                     <a href="{{ url_for('login') }}" class="text-muted hover:text-white transition text-sm">Sign In</a>
@@ -164,9 +164,9 @@
             </div>
             <div class="px-4 pb-4 flex flex-col gap-2">
                 {% if session.user %}
-                    <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-muted hover:text-white transition text-sm py-2">Profile</a>
-                    <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm py-2">My Lists</a>
                     <a href="{{ url_for('create_list') }}" class="btn-primary text-sm text-center py-2">+ New List</a>
+                    <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm py-2">My Lists</a>
+                    <a href="{{ url_for('user_profile', username=session.user.username) }}" class="text-muted hover:text-white transition text-sm py-2">Profile</a>
                     <a href="{{ url_for('logout') }}" class="text-muted hover:text-white transition text-sm py-2">Logout</a>
                 {% else %}
                     <a href="{{ url_for('login') }}" class="text-muted hover:text-white transition text-sm py-2">Sign In</a>

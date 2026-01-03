@@ -425,6 +425,9 @@ swapSearchInput.addEventListener('input', function() {
 function selectSwapTrack(track) {
     if (!currentSwapItemId) return;
 
+    // Show loading state
+    swapSearchResults.innerHTML = '<p class="p-4 text-forest">Saving...</p>';
+
     // Update the item in the database
     fetch(`/api/list/${listId}/update/${currentSwapItemId}`, {
         method: 'POST',
@@ -437,18 +440,37 @@ function selectSwapTrack(track) {
             album_art_url: track.album_art
         })
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            throw new Error('Failed to save');
+        }
+        return res.json();
+    })
     .then(data => {
         if (data.success) {
-            // Update the DOM
+            // Update the DOM - find the correct elements within the row
             const row = document.querySelector(`.item-row[data-id="${currentSwapItemId}"]`);
             if (row) {
-                row.querySelector('img').src = track.album_art || '';
-                row.querySelector('.font-medium').textContent = track.name;
-                row.querySelector('.text-forest').textContent = track.artist;
+                const img = row.querySelector('img');
+                const textDiv = row.querySelector('.flex-1.min-w-0');
+                if (img) img.src = track.album_art || '';
+                if (textDiv) {
+                    const titleEl = textDiv.querySelector('p:first-child');
+                    const artistEl = textDiv.querySelector('p:last-child');
+                    if (titleEl) titleEl.textContent = track.name;
+                    if (artistEl) artistEl.textContent = track.artist;
+                }
             }
             closeSwapModal();
+        } else {
+            alert('Failed to save. Please try again.');
+            closeSwapModal();
         }
+    })
+    .catch(err => {
+        console.error('Swap error:', err);
+        alert('Error saving swap. Please try again.');
+        closeSwapModal();
     });
 }
 

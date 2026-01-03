@@ -5,7 +5,7 @@
 {% block content %}
 <div class="flex justify-between items-center mb-8">
     <h1 class="text-3xl font-bold text-dark">My Lists</h1>
-    <a href="{{ url_for('create_list') }}" class="bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
+    <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-6 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">
         + New List
     </a>
 </div>
@@ -53,7 +53,7 @@
 {% else %}
     <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
         <p class="text-xl text-forest mb-4">You haven't created any lists yet</p>
-        <a href="{{ url_for('create_list') }}" class="bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
+        <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-6 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">
             Create your first list
         </a>
     </div>

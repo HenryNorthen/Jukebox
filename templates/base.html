@@ -5,20 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Jukebox{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        dark: '#102820',
+                        dark: '#1a3a2f',
                         forest: '#4C6444',
                         khaki: '#CABA9C',
                         khakilight: '#D9CEBD',
                         khakibg: '#E8E0D0',
                         brown: '#8A6240',
                         coffee: '#4D2D18',
-                        cardbg: '#F0E8DA',
+                        cardbg: '#F5EFE4',
+                        accent: '#C4704A',
+                        accenthover: '#A85D3B',
+                    },
+                    fontFamily: {
+                        'display': ['EB Garamond', 'Georgia', 'serif'],
+                        'ui': ['Inter', 'system-ui', 'sans-serif'],
                     }
                 }
             }
@@ -26,12 +32,20 @@
     </script>
     <style>
         body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        h1, h2, h3, .font-display {
             font-family: 'EB Garamond', Georgia, serif;
         }
         .album-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1.25rem;
+        }
+        @media (min-width: 1024px) {
+            .album-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
         }
         .album-tile {
             aspect-ratio: 1;
@@ -66,15 +80,15 @@
 <body class="bg-khakibg min-h-screen text-dark">
     <nav class="bg-khaki border-b-2 border-dark">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="{{ url_for('index') }}" class="text-2xl font-bold text-dark tracking-wide">Jukebox</a>
-            <div class="space-x-4">
+            <a href="{{ url_for('index') }}" class="text-2xl font-bold text-dark tracking-wide font-display">Jukebox</a>
+            <div class="flex items-center gap-4">
                 {% if session.user %}
-                    <a href="{{ url_for('dashboard') }}" class="text-dark hover:text-forest transition">My Lists</a>
-                    <a href="{{ url_for('create_list') }}" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">New List</a>
-                    <a href="{{ url_for('logout') }}" class="text-dark hover:text-forest transition">Logout</a>
+                    <a href="{{ url_for('dashboard') }}" class="text-dark hover:text-forest transition text-sm font-medium">My Lists</a>
+                    <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-4 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">+ New List</a>
+                    <a href="{{ url_for('logout') }}" class="text-dark hover:text-forest transition text-sm">Logout</a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="text-dark hover:text-forest transition">Login</a>
-                    <a href="{{ url_for('signup') }}" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">Sign Up</a>
+                    <a href="{{ url_for('login') }}" class="text-dark hover:text-forest transition text-sm font-medium">Login</a>
+                    <a href="{{ url_for('signup') }}" class="bg-accent text-white px-4 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">Sign Up</a>
                 {% endif %}
             </div>
         </div>

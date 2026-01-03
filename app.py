@@ -3,10 +3,12 @@ from functools import wraps
 from supabase import create_client, Client
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from datetime import timedelta
 from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 # Initialize Supabase
 supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
@@ -82,6 +84,7 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        remember = request.form.get('remember') == 'on'
 
         try:
             auth_response = supabase.auth.sign_in_with_password({
@@ -92,6 +95,10 @@ def login():
             if auth_response.user:
                 # Get profile
                 profile = supabase.table('profiles').select('*').eq('id', auth_response.user.id).single().execute()
+
+                # Set session to permanent if Remember Me is checked
+                if remember:
+                    session.permanent = True
 
                 session['user'] = {
                     'id': auth_response.user.id,

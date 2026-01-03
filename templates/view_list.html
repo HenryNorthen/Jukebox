@@ -1021,38 +1021,45 @@ document.getElementById('detail-modal').addEventListener('click', function(e) {
 // Store ratings for each item by name+artist
 const hoverRatingsCache = {};
 
-// Load ratings for all visible items on page load
+// Load ALL ratings in a single batch request on page load
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.hover-overlay').forEach(overlay => {
-        const name = overlay.dataset.name;
-        const artist = overlay.dataset.artist;
-        const type = overlay.dataset.type;
-        loadHoverRating(overlay, type, name, artist);
+    if (!isLoggedIn) return;
+
+    const overlays = document.querySelectorAll('.hover-overlay');
+    if (overlays.length === 0) return;
+
+    // Collect all items to fetch ratings for
+    const items = [];
+    overlays.forEach(overlay => {
+        items.push({
+            type: overlay.dataset.type,
+            name: overlay.dataset.name,
+            artist: overlay.dataset.artist
+        });
+    });
+
+    // Single batch request instead of N individual requests
+    fetch('/api/ratings/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+    })
+    .then(res => res.json())
+    .then(data => {
+        // Cache all ratings
+        Object.assign(hoverRatingsCache, data.ratings);
+
+        // Apply ratings to overlays
+        overlays.forEach(overlay => {
+            const key = `${overlay.dataset.type}:${overlay.dataset.name}:${overlay.dataset.artist}`;
+            const rating = hoverRatingsCache[key] || 0;
+            displayHoverRating(overlay, rating);
+        });
+    })
+    .catch(() => {
+        // On error, just leave stars empty
     });
 });
-
-function loadHoverRating(overlay, type, name, artist) {
-    const cacheKey = `${type}:${name}:${artist}`;
-    if (hoverRatingsCache[cacheKey] !== undefined) {
-        displayHoverRating(overlay, hoverRatingsCache[cacheKey]);
-        return;
-    }
-
-    const endpoint = type === 'album'
-        ? `/api/album/rating?album=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`
-        : `/api/song/rating?track=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`;
-
-    fetch(endpoint)
-        .then(res => res.json())
-        .then(data => {
-            const rating = data.rating || 0;
-            hoverRatingsCache[cacheKey] = rating;
-            displayHoverRating(overlay, rating);
-        })
-        .catch(() => {
-            hoverRatingsCache[cacheKey] = 0;
-        });
-}
 
 function displayHoverRating(overlay, rating) {
     const starsContainer = overlay.querySelector('.hover-stars');

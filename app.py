@@ -14,6 +14,12 @@ app = Flask(__name__)
 app.config.from_object(Config)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
+# ============== HEALTH CHECK (prevents Railway cold starts) ==============
+@app.route('/health')
+def health_check():
+    """Health check endpoint for uptime monitoring to prevent cold starts."""
+    return jsonify({'status': 'ok', 'timestamp': datetime.utcnow().isoformat()})
+
 # Initialize Supabase
 supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
 
@@ -619,9 +625,21 @@ def reorder_list_all(list_id):
     data = request.json
     order = data.get('order', [])
 
-    # Update each item's position
-    for item in order:
-        supabase.table('list_items').update({'position': item['position']}).eq('id', item['item_id']).execute()
+    # Batch update: delete and re-insert with new positions is faster than N updates
+    # But for small lists, parallel updates are acceptable. For larger lists, use RPC.
+    # Simple optimization: only update items whose position changed
+    if order:
+        # Get current positions
+        item_ids = [item['item_id'] for item in order]
+        current = supabase.table('list_items').select('id, position').in_('id', item_ids).execute()
+        current_positions = {item['id']: item['position'] for item in (current.data or [])}
+
+        # Only update changed positions
+        for item in order:
+            item_id = item['item_id']
+            new_pos = item['position']
+            if current_positions.get(item_id) != new_pos:
+                supabase.table('list_items').update({'position': new_pos}).eq('id', item_id).execute()
 
     return jsonify({'success': True})
 
@@ -657,7 +675,7 @@ def search_users():
 @app.route('/u/<username>')
 def user_profile(username):
     """View a user's public profile and lists."""
-    # Get user
+    # Get user profile - includes spotify info so we don't need separate query
     profile_result = supabase.table('profiles').select('*').eq('username', username).single().execute()
 
     if not profile_result.data:
@@ -665,71 +683,79 @@ def user_profile(username):
         return redirect(url_for('index'))
 
     profile = profile_result.data
+    profile_id = profile['id']
 
     # Check if current user is viewing their own profile
-    is_owner = 'user' in session and session['user']['id'] == profile['id']
+    current_user_id = session['user']['id'] if 'user' in session else None
+    is_owner = current_user_id == profile_id
 
-    # Get their public lists
-    lists_result = supabase.table('lists').select('*').eq('user_id', profile['id']).eq('is_public', True).order('created_at', desc=True).execute()
-    lists = lists_result.data if lists_result.data else []
-
-    # Batch fetch metadata for all lists (eliminates N+1 queries)
-    enrich_lists_with_metadata(lists)
-
-    # Get favorite songs and albums (with error handling if table doesn't exist)
+    # Initialize all data with defaults
+    lists = []
     favorite_songs = []
     favorite_albums = []
-    try:
-        fav_songs_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'song').order('position').limit(5).execute()
-        favorite_songs = fav_songs_result.data if fav_songs_result.data else []
-
-        fav_albums_result = supabase.table('profile_favorites').select('*').eq('user_id', profile['id']).eq('favorite_type', 'album').order('position').limit(5).execute()
-        favorite_albums = fav_albums_result.data if fav_albums_result.data else []
-    except Exception:
-        pass  # Table might not exist yet
-
-    # Get album and song ratings
     album_ratings = []
     song_ratings = []
-    try:
-        album_ratings_result = supabase.table('album_ratings').select('*').eq('user_id', profile['id']).order('created_at', desc=True).execute()
-        album_ratings = album_ratings_result.data if album_ratings_result.data else []
-
-        song_ratings_result = supabase.table('song_ratings').select('*').eq('user_id', profile['id']).order('created_at', desc=True).execute()
-        song_ratings = song_ratings_result.data if song_ratings_result.data else []
-    except Exception:
-        pass  # Tables might not exist yet
-
-    # Get follower/following counts
     follower_count = 0
     following_count = 0
     is_following = False
+
+    # Batch fetch: Get lists, favorites, and ratings in fewer queries
     try:
-        follower_result = supabase.table('followers').select('id', count='exact').eq('following_id', profile['id']).execute()
+        # Query 1: Get public lists
+        lists_result = supabase.table('lists').select('*').eq('user_id', profile_id).eq('is_public', True).order('created_at', desc=True).execute()
+        lists = lists_result.data if lists_result.data else []
+        if lists:
+            enrich_lists_with_metadata(lists)
+
+        # Query 2: Get ALL favorites at once (songs + albums)
+        favorites_result = supabase.table('profile_favorites').select('*').eq('user_id', profile_id).order('position').execute()
+        if favorites_result.data:
+            for fav in favorites_result.data:
+                if fav['favorite_type'] == 'song' and len(favorite_songs) < 5:
+                    favorite_songs.append(fav)
+                elif fav['favorite_type'] == 'album' and len(favorite_albums) < 5:
+                    favorite_albums.append(fav)
+
+        # Query 3: Get album ratings
+        album_ratings_result = supabase.table('album_ratings').select('*').eq('user_id', profile_id).order('created_at', desc=True).execute()
+        album_ratings = album_ratings_result.data if album_ratings_result.data else []
+
+        # Query 4: Get song ratings
+        song_ratings_result = supabase.table('song_ratings').select('*').eq('user_id', profile_id).order('created_at', desc=True).execute()
+        song_ratings = song_ratings_result.data if song_ratings_result.data else []
+
+        # Query 5: Get follower count
+        follower_result = supabase.table('followers').select('id', count='exact').eq('following_id', profile_id).execute()
         follower_count = follower_result.count if follower_result.count else 0
 
-        following_result = supabase.table('followers').select('id', count='exact').eq('follower_id', profile['id']).execute()
+        # Query 6: Get following count
+        following_result = supabase.table('followers').select('id', count='exact').eq('follower_id', profile_id).execute()
         following_count = following_result.count if following_result.count else 0
 
-        # Check if current user is following this profile
-        if 'user' in session and session['user']['id'] != profile['id']:
-            follow_check = supabase.table('followers').select('id').eq('follower_id', session['user']['id']).eq('following_id', profile['id']).execute()
+        # Query 7 (conditional): Check if current user follows this profile
+        if current_user_id and current_user_id != profile_id:
+            follow_check = supabase.table('followers').select('id').eq('follower_id', current_user_id).eq('following_id', profile_id).execute()
             is_following = bool(follow_check.data)
-    except Exception:
-        pass  # Table might not exist yet
 
-    # Check if profile has Spotify linked
+    except Exception as e:
+        print(f"Profile data fetch error: {e}")
+
+    # Spotify info from profile (no extra query needed)
     has_spotify = bool(profile.get('spotify_user_id'))
     spotify_user_id = profile.get('spotify_user_id') if has_spotify else None
 
-    # Check if current user has Spotify connected (for import/export features)
+    # Current user's spotify status - use cached session data if available
     current_user_has_spotify = False
-    if 'user' in session:
-        try:
-            current_profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
-            current_user_has_spotify = bool(current_profile.data and current_profile.data.get('spotify_user_id'))
-        except Exception:
-            pass
+    if current_user_id:
+        # For owner, we already have the profile data
+        if is_owner:
+            current_user_has_spotify = has_spotify
+        else:
+            try:
+                current_profile = supabase.table('profiles').select('spotify_user_id').eq('id', current_user_id).single().execute()
+                current_user_has_spotify = bool(current_profile.data and current_profile.data.get('spotify_user_id'))
+            except Exception:
+                pass
 
     return render_template('profile.html', profile=profile, lists=lists,
                           favorite_songs=favorite_songs, favorite_albums=favorite_albums,
@@ -1358,6 +1384,46 @@ def get_user_song_ratings():
         return jsonify({'ratings': result.data if result.data else []})
     except Exception:
         return jsonify({'ratings': []})
+
+
+@app.route('/api/ratings/batch', methods=['POST'])
+def get_batch_ratings():
+    """Get ratings for multiple items at once (reduces N+1 API calls)."""
+    if 'user' not in session:
+        return jsonify({'ratings': {}})
+
+    user_id = session['user']['id']
+    data = request.json
+    items = data.get('items', [])  # List of {type, name, artist}
+
+    if not items:
+        return jsonify({'ratings': {}})
+
+    ratings = {}
+
+    try:
+        # Separate songs and albums
+        songs = [i for i in items if i.get('type') == 'song']
+        albums = [i for i in items if i.get('type') == 'album']
+
+        # Batch fetch song ratings
+        if songs:
+            song_ratings = supabase.table('song_ratings').select('track_name, artist_name, rating').eq('user_id', user_id).execute()
+            for r in (song_ratings.data or []):
+                key = f"song:{r['track_name']}:{r['artist_name']}"
+                ratings[key] = r['rating']
+
+        # Batch fetch album ratings
+        if albums:
+            album_ratings = supabase.table('album_ratings').select('album_name, artist_name, rating').eq('user_id', user_id).execute()
+            for r in (album_ratings.data or []):
+                key = f"album:{r['album_name']}:{r['artist_name']}"
+                ratings[key] = r['rating']
+
+    except Exception as e:
+        print(f"Batch ratings error: {e}")
+
+    return jsonify({'ratings': ratings})
 
 
 # ============== FOLLOW API ==============

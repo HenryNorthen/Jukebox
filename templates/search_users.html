@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Find Users - Jukebox{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold mb-2">Find Users</h1>
+    <p class="text-muted text-sm">Search for users by username</p>
+</div>
+
+<div class="max-w-xl mb-8">
+    <form method="GET" action="{{ url_for('search_users') }}" class="flex gap-3">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="Search username..."
+               class="input-field flex-1" autofocus>
+        <button type="submit" class="btn-primary">Search</button>
+    </form>
+</div>
+
+{% if query %}
+    {% if users %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for user in users %}
+            <a href="{{ url_for('user_profile', username=user.username) }}" class="card p-5 hover:border-accent transition block">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-elevated flex items-center justify-center text-accent font-bold text-lg">
+                        {{ user.username[0].upper() }}
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-white">{{ user.username }}</h3>
+                        <p class="text-xs text-muted">{{ user.list_count or 0 }} public list{{ 's' if user.list_count != 1 else '' }}</p>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card text-center py-12 px-6">
+            <p class="text-muted">No users found matching "{{ query }}"</p>
+        </div>
+    {% endif %}
+{% else %}
+    <div class="card text-center py-12 px-6">
+        <p class="text-muted">Enter a username to search</p>
+    </div>
+{% endif %}
+{% endblock %}

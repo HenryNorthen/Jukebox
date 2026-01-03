@@ -438,6 +438,25 @@ def reorder_list_all(list_id):
     return jsonify({'success': True})
 
 
+@app.route('/users')
+def search_users():
+    """Search for users by username."""
+    query = request.args.get('q', '').strip()
+    users = []
+
+    if query:
+        # Search for users with username containing the query
+        result = supabase.table('profiles').select('*').ilike('username', f'%{query}%').limit(20).execute()
+        users = result.data if result.data else []
+
+        # Get public list count for each user
+        for user in users:
+            count_result = supabase.table('lists').select('id', count='exact').eq('user_id', user['id']).eq('is_public', True).execute()
+            user['list_count'] = count_result.count if count_result.count else 0
+
+    return render_template('search_users.html', users=users, query=query)
+
+
 @app.route('/u/<username>')
 def user_profile(username):
     """View a user's public profile and lists."""

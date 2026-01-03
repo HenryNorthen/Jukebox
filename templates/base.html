@@ -14,10 +14,10 @@
                         base: '#14181c',
                         surface: '#1c2228',
                         elevated: '#242c34',
-                        border: '#2c3440',
+                        border: '#3a3f47',
                         muted: '#99aabb',
-                        accent: '#00c853',
-                        accentHover: '#00e676',
+                        accent: '#e07840',
+                        accentHover: '#f08a50',
                         danger: '#ef4444',
                     }
                 }
@@ -30,12 +30,12 @@
         .album-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.75rem;
+            gap: 1rem;
         }
         @media (min-width: 768px) {
             .album-grid {
                 grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-                gap: 1rem;
+                gap: 1.25rem;
             }
         }
         @media (min-width: 1024px) {
@@ -48,7 +48,7 @@
             aspect-ratio: 1;
             position: relative;
             overflow: hidden;
-            border-radius: 4px;
+            border-radius: 6px;
             background: #242c34;
         }
         .album-tile img {
@@ -63,34 +63,34 @@
 
         .rank-badge {
             position: absolute;
-            top: 6px;
-            left: 6px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00c853;
-            font-size: 0.7rem;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #e07840;
+            font-size: 0.75rem;
             font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 3px;
+            padding: 3px 8px;
+            border-radius: 4px;
         }
 
         .btn-primary {
-            background: #00c853;
-            color: #14181c;
+            background: #e07840;
+            color: #fff;
             font-weight: 600;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
             font-size: 0.875rem;
             transition: background 0.15s;
         }
-        .btn-primary:hover { background: #00e676; }
+        .btn-primary:hover { background: #f08a50; }
 
         .btn-secondary {
             background: transparent;
             color: #99aabb;
             font-weight: 500;
-            padding: 0.5rem 1rem;
-            border: 1px solid #2c3440;
-            border-radius: 4px;
+            padding: 0.5rem 1.25rem;
+            border: 1px solid #3a3f47;
+            border-radius: 6px;
             font-size: 0.875rem;
             transition: all 0.15s;
         }
@@ -101,31 +101,32 @@
 
         .input-field {
             width: 100%;
-            padding: 0.625rem 0.875rem;
+            padding: 0.75rem 1rem;
             background: #1c2228;
-            border: 1px solid #2c3440;
-            border-radius: 4px;
+            border: 1px solid #3a3f47;
+            border-radius: 6px;
             color: #fff;
             font-size: 0.875rem;
         }
         .input-field:focus {
             outline: none;
-            border-color: #00c853;
+            border-color: #e07840;
         }
         .input-field::placeholder { color: #667788; }
 
         .card {
             background: #1c2228;
-            border: 1px solid #2c3440;
-            border-radius: 6px;
+            border: 1px solid #3a3f47;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body class="bg-base min-h-screen text-white">
     <nav class="bg-surface border-b border-border">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <a href="{{ url_for('index') }}" class="text-xl font-bold text-accent tracking-tight">Jukebox</a>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-5">
+                <a href="{{ url_for('search_users') }}" class="text-muted hover:text-white transition text-sm">Find Users</a>
                 {% if session.user %}
                     <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm">My Lists</a>
                     <a href="{{ url_for('create_list') }}" class="btn-primary text-xs">+ New List</a>
@@ -138,11 +139,11 @@
         </div>
     </nav>
 
-    <main class="max-w-6xl mx-auto px-4 py-6">
+    <main class="max-w-6xl mx-auto px-6 py-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="mb-4 px-4 py-3 rounded text-sm {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-green-900/50 text-green-300 border border-green-800{% endif %}">
+                    <div class="mb-4 px-4 py-3 rounded-lg text-sm {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-orange-900/50 text-orange-300 border border-orange-800{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}

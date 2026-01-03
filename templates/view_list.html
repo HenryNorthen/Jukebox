@@ -34,7 +34,7 @@
 {% if items %}
     <div id="album-grid" class="album-grid">
         {% for item in items %}
-        <div class="album-tile group {% if is_owner %}cursor-grab active:cursor-grabbing{% endif %}" data-id="{{ item.id }}">
+        <div class="album-tile group" data-id="{{ item.id }}">
             {% if item.album_art_url %}
                 <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}" draggable="false">
             {% else %}
@@ -91,25 +91,37 @@ function duplicateList() {
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 const albumGrid = document.getElementById('album-grid');
-new Sortable(albumGrid, {
-    animation: 150,
-    ghostClass: 'opacity-50',
-    onEnd: function(evt) {
-        updateRankBadges();
 
-        const items = albumGrid.querySelectorAll('.album-tile');
-        const order = Array.from(items).map((item, index) => ({
-            item_id: item.dataset.id,
-            position: index + 1
-        }));
+// Detect if device is touch-only (mobile)
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-        fetch(`/api/list/${listId}/reorder-all`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order })
-        });
-    }
-});
+// Only enable drag-and-drop on desktop
+if (!isTouchDevice) {
+    new Sortable(albumGrid, {
+        animation: 150,
+        ghostClass: 'opacity-50',
+        onEnd: function(evt) {
+            updateRankBadges();
+
+            const items = albumGrid.querySelectorAll('.album-tile');
+            const order = Array.from(items).map((item, index) => ({
+                item_id: item.dataset.id,
+                position: index + 1
+            }));
+
+            fetch(`/api/list/${listId}/reorder-all`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order })
+            });
+        }
+    });
+
+    // Update cursor styles for desktop
+    albumGrid.querySelectorAll('.album-tile').forEach(tile => {
+        tile.classList.add('cursor-grab');
+    });
+}
 
 function updateRankBadges() {
     const badges = albumGrid.querySelectorAll('.rank-badge');

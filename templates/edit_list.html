@@ -206,27 +206,37 @@ bulkAddBtn.addEventListener('click', async () => {
     if (added > 0) bulkInput.value = '';
 });
 
-const sortable = new Sortable(itemsContainer, {
-    animation: 150,
-    handle: '.drag-handle',
-    ghostClass: 'opacity-50',
-    onEnd: function(evt) {
-        const rows = itemsContainer.querySelectorAll('.item-row');
-        const newOrder = [];
-        rows.forEach((row, index) => {
-            const itemId = row.dataset.id;
-            const newPosition = index + 1;
-            newOrder.push({ item_id: itemId, position: newPosition });
-            const posDisplay = row.querySelector('.position-display');
-            if (posDisplay) posDisplay.textContent = newPosition;
-        });
-        fetch(`/api/list/${listId}/reorder-all`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: newOrder })
-        });
-    }
-});
+// Detect if device is touch-only (mobile)
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// Only enable drag-and-drop on desktop
+let sortable = null;
+if (!isTouchDevice) {
+    sortable = new Sortable(itemsContainer, {
+        animation: 150,
+        handle: '.drag-handle',
+        ghostClass: 'opacity-50',
+        onEnd: function(evt) {
+            const rows = itemsContainer.querySelectorAll('.item-row');
+            const newOrder = [];
+            rows.forEach((row, index) => {
+                const itemId = row.dataset.id;
+                const newPosition = index + 1;
+                newOrder.push({ item_id: itemId, position: newPosition });
+                const posDisplay = row.querySelector('.position-display');
+                if (posDisplay) posDisplay.textContent = newPosition;
+            });
+            fetch(`/api/list/${listId}/reorder-all`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: newOrder })
+            });
+        }
+    });
+} else {
+    // Hide drag handles on mobile
+    document.querySelectorAll('.drag-handle').forEach(el => el.style.display = 'none');
+}
 
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);

@@ -97,6 +97,60 @@
     </div>
 </div>
 
+<!-- Ratings Section -->
+<div class="mb-10">
+    <div class="flex gap-4 border-b border-border mb-4">
+        <button id="tab-album-ratings" onclick="showRatingsTab('album')" class="text-sm font-semibold text-accent pb-3 border-b-2 border-accent">Album Ratings</button>
+        <button id="tab-song-ratings" onclick="showRatingsTab('song')" class="text-sm font-semibold text-muted pb-3 border-b-2 border-transparent hover:text-white">Song Ratings</button>
+    </div>
+
+    <!-- Album Ratings Grid -->
+    <div id="album-ratings-grid" class="album-grid">
+        {% for rating in album_ratings %}
+        <div class="album-tile group">
+            {% if rating.album_art_url %}
+            <img src="{{ rating.album_art_url }}" alt="{{ rating.album_name }}" draggable="false">
+            {% else %}
+            <div class="w-full h-full bg-elevated flex items-center justify-center">
+                <span class="text-3xl text-muted">♪</span>
+            </div>
+            {% endif %}
+            <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                <p class="text-white font-medium text-sm truncate">{{ rating.album_name }}</p>
+                <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        {% if not album_ratings %}
+        <p class="text-muted text-sm col-span-full">No album ratings yet</p>
+        {% endif %}
+    </div>
+
+    <!-- Song Ratings Grid -->
+    <div id="song-ratings-grid" class="album-grid hidden">
+        {% for rating in song_ratings %}
+        <div class="album-tile group">
+            {% if rating.album_art_url %}
+            <img src="{{ rating.album_art_url }}" alt="{{ rating.track_name }}" draggable="false">
+            {% else %}
+            <div class="w-full h-full bg-elevated flex items-center justify-center">
+                <span class="text-3xl text-muted">♪</span>
+            </div>
+            {% endif %}
+            <div class="rank-badge" style="background: rgba(34, 211, 238, 0.9); color: #14181c;">★ {{ rating.rating }}</div>
+            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 pointer-events-none">
+                <p class="text-white font-medium text-sm truncate">{{ rating.track_name }}</p>
+                <p class="text-muted text-xs truncate">{{ rating.artist_name }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        {% if not song_ratings %}
+        <p class="text-muted text-sm col-span-full">No song ratings yet</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Public Lists -->
 <div>
     <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-5">Public Lists</h2>
@@ -172,6 +226,31 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// Ratings tab switching
+function showRatingsTab(type) {
+    const albumTab = document.getElementById('tab-album-ratings');
+    const songTab = document.getElementById('tab-song-ratings');
+    const albumGrid = document.getElementById('album-ratings-grid');
+    const songGrid = document.getElementById('song-ratings-grid');
+
+    if (type === 'album') {
+        albumTab.classList.remove('text-muted', 'border-transparent');
+        albumTab.classList.add('text-accent', 'border-accent');
+        songTab.classList.remove('text-accent', 'border-accent');
+        songTab.classList.add('text-muted', 'border-transparent');
+        albumGrid.classList.remove('hidden');
+        songGrid.classList.add('hidden');
+    } else {
+        songTab.classList.remove('text-muted', 'border-transparent');
+        songTab.classList.add('text-accent', 'border-accent');
+        albumTab.classList.remove('text-accent', 'border-accent');
+        albumTab.classList.add('text-muted', 'border-transparent');
+        songGrid.classList.remove('hidden');
+        albumGrid.classList.add('hidden');
+    }
+}
+</script>
 {% if is_owner %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>

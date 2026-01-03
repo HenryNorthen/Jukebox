@@ -88,18 +88,17 @@
         </svg>
         Add to list
     </button>
-    <button onclick="addToListenList()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 8v4l3 3"/>
-            <circle cx="12" cy="12" r="10"/>
-        </svg>
-        Add to listen-list
-    </button>
-    <button onclick="openRatingModal()">
+    <button onclick="openRatingModal('album')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
         </svg>
         Rate album
+    </button>
+    <button onclick="openRatingModal('song')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        Rate song
     </button>
 </div>
 
@@ -123,13 +122,13 @@
 <div id="rating-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
     <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-sm mx-4">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold text-lg">Rate Album</h3>
+            <h3 id="rating-modal-title" class="font-semibold text-lg">Rate Album</h3>
             <button onclick="closeRatingModal()" class="text-muted hover:text-white text-2xl">&times;</button>
         </div>
         <div class="flex items-center gap-3 mb-6">
             <img id="rating-album-art" src="" alt="" class="w-16 h-16 rounded object-cover bg-elevated">
             <div class="flex-1 min-w-0">
-                <p id="rating-album-name" class="font-medium truncate"></p>
+                <p id="rating-item-name" class="font-medium truncate"></p>
                 <p id="rating-artist-name" class="text-sm text-muted truncate"></p>
             </div>
         </div>
@@ -283,6 +282,7 @@ let currentTileId = null;
 let currentTrackData = null;
 let currentRating = 0;
 let selectedRating = 0;
+let currentRatingType = 'album'; // 'album' or 'song'
 
 // Close menu when clicking outside
 document.addEventListener('click', (e) => {
@@ -408,35 +408,15 @@ function createNewListWithTrack() {
     });
 }
 
-function addToListenList() {
+function openRatingModal(type) {
     document.getElementById('tile-menu').classList.add('hidden');
+    currentRatingType = type;
 
-    fetch('/api/listen-list/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            album_name: currentTrackData.albumName,
-            artist_name: currentTrackData.artistName,
-            album_art_url: currentTrackData.albumArt
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            // Show brief confirmation
-            showToast('Added to listen-list');
-        } else {
-            alert(data.error || 'Failed to add to listen-list');
-        }
-    });
-}
-
-function openRatingModal() {
-    document.getElementById('tile-menu').classList.add('hidden');
-
-    // Set album info in modal
+    // Update modal title and info based on type
+    const isAlbum = type === 'album';
+    document.getElementById('rating-modal-title').textContent = isAlbum ? 'Rate Album' : 'Rate Song';
     document.getElementById('rating-album-art').src = currentTrackData.albumArt || '';
-    document.getElementById('rating-album-name').textContent = currentTrackData.albumName;
+    document.getElementById('rating-item-name').textContent = isAlbum ? currentTrackData.albumName : currentTrackData.trackName;
     document.getElementById('rating-artist-name').textContent = currentTrackData.artistName;
 
     // Load existing rating
@@ -452,7 +432,11 @@ function closeRatingModal() {
 }
 
 function loadExistingRating() {
-    fetch(`/api/album/rating?album=${encodeURIComponent(currentTrackData.albumName)}&artist=${encodeURIComponent(currentTrackData.artistName)}`)
+    const endpoint = currentRatingType === 'album'
+        ? `/api/album/rating?album=${encodeURIComponent(currentTrackData.albumName)}&artist=${encodeURIComponent(currentTrackData.artistName)}`
+        : `/api/song/rating?track=${encodeURIComponent(currentTrackData.trackName)}&artist=${encodeURIComponent(currentTrackData.artistName)}`;
+
+    fetch(endpoint)
         .then(res => res.json())
         .then(data => {
             if (data.rating) {
@@ -497,9 +481,20 @@ function updateStarDisplay(value) {
             // Full star
             fillSvg.style.clipPath = 'inset(0 0% 0 0)';
         } else if (value > index) {
-            // Partial star
-            const percentage = (value - index) * 100;
-            fillSvg.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+            // Partial star - use adjusted percentages for better visual fill
+            // Star shape is narrow at edges, so we boost quarter values
+            const fraction = value - index;
+            let visualPercentage;
+            if (fraction <= 0.25) {
+                visualPercentage = 40; // 0.25 star shows 40% width
+            } else if (fraction <= 0.5) {
+                visualPercentage = 55; // 0.5 star shows 55% width
+            } else if (fraction <= 0.75) {
+                visualPercentage = 75; // 0.75 star shows 75% width
+            } else {
+                visualPercentage = 100;
+            }
+            fillSvg.style.clipPath = `inset(0 ${100 - visualPercentage}% 0 0)`;
         } else {
             // Empty star
             fillSvg.style.clipPath = 'inset(0 100% 0 0)';
@@ -514,15 +509,25 @@ function clearRating() {
 }
 
 function saveRating() {
-    fetch('/api/album/rating', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const endpoint = currentRatingType === 'album' ? '/api/album/rating' : '/api/song/rating';
+    const body = currentRatingType === 'album'
+        ? {
             album_name: currentTrackData.albumName,
             artist_name: currentTrackData.artistName,
             album_art_url: currentTrackData.albumArt,
             rating: selectedRating
-        })
+        }
+        : {
+            track_name: currentTrackData.trackName,
+            artist_name: currentTrackData.artistName,
+            album_art_url: currentTrackData.albumArt,
+            rating: selectedRating
+        };
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
     })
     .then(res => res.json())
     .then(data => {

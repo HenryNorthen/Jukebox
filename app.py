@@ -504,8 +504,21 @@ def user_profile(username):
     except Exception:
         pass  # Table might not exist yet
 
+    # Get album and song ratings
+    album_ratings = []
+    song_ratings = []
+    try:
+        album_ratings_result = supabase.table('album_ratings').select('*').eq('user_id', profile['id']).order('created_at', desc=True).execute()
+        album_ratings = album_ratings_result.data if album_ratings_result.data else []
+
+        song_ratings_result = supabase.table('song_ratings').select('*').eq('user_id', profile['id']).order('created_at', desc=True).execute()
+        song_ratings = song_ratings_result.data if song_ratings_result.data else []
+    except Exception:
+        pass  # Tables might not exist yet
+
     return render_template('profile.html', profile=profile, lists=lists,
-                          favorite_songs=favorite_songs, favorite_albums=favorite_albums, is_owner=is_owner)
+                          favorite_songs=favorite_songs, favorite_albums=favorite_albums,
+                          album_ratings=album_ratings, song_ratings=song_ratings, is_owner=is_owner)
 
 
 @app.route('/api/spotify/search/albums')
@@ -778,6 +791,81 @@ def get_user_ratings():
 
     try:
         result = supabase.table('album_ratings').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+        return jsonify({'ratings': result.data if result.data else []})
+    except Exception:
+        return jsonify({'ratings': []})
+
+
+# ============== SONG RATINGS API ==============
+
+@app.route('/api/song/rating', methods=['GET'])
+@login_required
+def get_song_rating():
+    """Get user's rating for a song."""
+    user_id = session['user']['id']
+    track_name = request.args.get('track')
+    artist_name = request.args.get('artist')
+
+    try:
+        result = supabase.table('song_ratings').select('rating').eq('user_id', user_id).eq('track_name', track_name).eq('artist_name', artist_name).single().execute()
+
+        if result.data:
+            return jsonify({'rating': result.data['rating']})
+        return jsonify({'rating': None})
+    except Exception:
+        return jsonify({'rating': None})
+
+
+@app.route('/api/song/rating', methods=['POST'])
+@login_required
+def save_song_rating():
+    """Save or update user's rating for a song."""
+    user_id = session['user']['id']
+    data = request.json
+
+    track_name = data.get('track_name')
+    artist_name = data.get('artist_name')
+    rating = data.get('rating')
+
+    try:
+        # Check if rating exists
+        existing = supabase.table('song_ratings').select('id').eq('user_id', user_id).eq('track_name', track_name).eq('artist_name', artist_name).execute()
+
+        if rating == 0:
+            # Delete rating if set to 0
+            if existing.data:
+                supabase.table('song_ratings').delete().eq('id', existing.data[0]['id']).execute()
+            return jsonify({'success': True})
+
+        if existing.data:
+            # Update existing rating
+            supabase.table('song_ratings').update({
+                'rating': rating,
+                'album_art_url': data.get('album_art_url')
+            }).eq('id', existing.data[0]['id']).execute()
+        else:
+            # Insert new rating
+            supabase.table('song_ratings').insert({
+                'user_id': user_id,
+                'track_name': track_name,
+                'artist_name': artist_name,
+                'album_art_url': data.get('album_art_url'),
+                'rating': rating
+            }).execute()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/song/ratings')
+@login_required
+def get_user_song_ratings():
+    """Get all of user's song ratings."""
+    user_id = session['user']['id']
+
+    try:
+        result = supabase.table('song_ratings').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
         return jsonify({'ratings': result.data if result.data else []})
     except Exception:
         return jsonify({'ratings': []})

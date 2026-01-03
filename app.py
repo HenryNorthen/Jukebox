@@ -385,7 +385,17 @@ def view_list(list_id):
     items_result = supabase.table('list_items').select('*').eq('list_id', list_id).order('position').execute()
     items = items_result.data if items_result.data else []
 
-    return render_template('view_list.html', list=lst, items=items, is_owner=is_owner)
+    # Check if current user has Spotify connected (for showing export button)
+    current_user_has_spotify = False
+    if 'user' in session:
+        try:
+            profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
+            current_user_has_spotify = bool(profile.data and profile.data.get('spotify_user_id'))
+        except Exception:
+            pass
+
+    return render_template('view_list.html', list=lst, items=items, is_owner=is_owner,
+                          current_user_has_spotify=current_user_has_spotify)
 
 
 @app.route('/list/<list_id>/edit')
@@ -787,6 +797,99 @@ def spotify_search_albums():
         return jsonify({'albums': albums})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/profile/picture', methods=['POST'])
+@login_required
+def upload_profile_picture():
+    """Upload a profile picture to Supabase Storage."""
+    if 'picture' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['picture']
+    if not file.filename:
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Validate file type
+    allowed_types = {'image/jpeg', 'image/png', 'image/webp'}
+    if file.content_type not in allowed_types:
+        return jsonify({'error': 'Invalid file type. Use JPG, PNG, or WebP'}), 400
+
+    # Validate file size (2MB max)
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > 2 * 1024 * 1024:
+        return jsonify({'error': 'File too large. Max 2MB'}), 400
+
+    user_id = session['user']['id']
+
+    try:
+        # Generate filename
+        ext = file.content_type.split('/')[-1]
+        if ext == 'jpeg':
+            ext = 'jpg'
+        filename = f"profile-pictures/{user_id}.{ext}"
+
+        # Read file content
+        file_content = file.read()
+
+        # Upload to Supabase Storage
+        # First try to remove old picture if exists
+        try:
+            supabase.storage.from_('avatars').remove([f"profile-pictures/{user_id}.jpg", f"profile-pictures/{user_id}.png", f"profile-pictures/{user_id}.webp"])
+        except Exception:
+            pass
+
+        # Upload new picture
+        result = supabase.storage.from_('avatars').upload(
+            filename,
+            file_content,
+            {'content-type': file.content_type, 'upsert': 'true'}
+        )
+
+        # Get public URL
+        public_url = supabase.storage.from_('avatars').get_public_url(filename)
+
+        # Update profile with new picture URL
+        supabase.table('profiles').update({
+            'profile_picture_url': public_url
+        }).eq('id', user_id).execute()
+
+        return jsonify({'success': True, 'url': public_url})
+
+    except Exception as e:
+        print(f"Profile picture upload error: {e}")
+        return jsonify({'error': 'Failed to upload picture'}), 500
+
+
+@app.route('/api/profile/picture', methods=['DELETE'])
+@login_required
+def delete_profile_picture():
+    """Delete profile picture."""
+    user_id = session['user']['id']
+
+    try:
+        # Remove from storage
+        try:
+            supabase.storage.from_('avatars').remove([
+                f"profile-pictures/{user_id}.jpg",
+                f"profile-pictures/{user_id}.png",
+                f"profile-pictures/{user_id}.webp"
+            ])
+        except Exception:
+            pass
+
+        # Update profile to remove picture URL
+        supabase.table('profiles').update({
+            'profile_picture_url': None
+        }).eq('id', user_id).execute()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Profile picture delete error: {e}")
+        return jsonify({'error': 'Failed to delete picture'}), 500
 
 
 @app.route('/api/profile/favorites', methods=['GET'])

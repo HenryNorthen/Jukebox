@@ -6,8 +6,30 @@
 <!-- Profile Header -->
 <div class="flex flex-col md:flex-row md:items-start gap-4 md:gap-6 mb-8 md:mb-10">
     <div class="flex items-center gap-4 md:block">
-        <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-elevated flex items-center justify-center text-accent text-2xl md:text-3xl font-bold flex-shrink-0">
-            {{ profile.username[0].upper() }}
+        <div class="relative flex-shrink-0 group">
+            {% if profile.profile_picture_url %}
+            <img src="{{ profile.profile_picture_url }}" alt="{{ profile.username }}" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+            {% else %}
+            <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-elevated flex items-center justify-center text-accent text-2xl md:text-3xl font-bold">
+                {{ profile.username[0].upper() }}
+            </div>
+            {% endif %}
+            {% if is_owner %}
+            <button onclick="openProfilePictureModal()" class="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </button>
+            {% endif %}
+            {% if has_spotify %}
+            <!-- Spotify Beta Badge -->
+            <div class="absolute -bottom-1 -right-1 w-6 h-6 md:w-7 md:h-7 bg-[#1DB954] rounded-full flex items-center justify-center border-2 border-base" title="Spotify Beta Tester">
+                <svg class="w-3.5 h-3.5 md:w-4 md:h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                </svg>
+            </div>
+            {% endif %}
         </div>
         <div class="md:hidden flex-1">
             <h1 class="text-xl font-bold text-white">{{ profile.username }}</h1>
@@ -49,10 +71,10 @@
         <button onclick="openImportSpotifyModal()" class="btn-secondary text-xs">Import</button>
         <button onclick="openDisconnectSpotifyModal()" class="btn-secondary text-xs text-red-400 hover:text-red-300">Disconnect</button>
         {% else %}
-        <a href="{{ url_for('connect_spotify') }}" class="btn-spotify text-xs">
+        <button onclick="openSpotifyBetaModal()" class="btn-spotify text-xs">
             <svg class="w-4 h-4 inline-block mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
             Link Spotify
-        </a>
+        </button>
         {% endif %}
         {% else %}
         {% if has_spotify %}
@@ -452,6 +474,69 @@
 </div>
 
 {% if is_owner %}
+<!-- Profile Picture Upload Modal -->
+<div id="profile-picture-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-lg">Update Profile Picture</h3>
+            <button onclick="closeProfilePictureModal()" class="text-muted hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div id="picture-preview-container" class="flex justify-center mb-4">
+            {% if profile.profile_picture_url %}
+            <img id="picture-preview" src="{{ profile.profile_picture_url }}" alt="Preview" class="w-32 h-32 rounded-full object-cover">
+            {% else %}
+            <div id="picture-preview" class="w-32 h-32 rounded-full bg-elevated flex items-center justify-center text-accent text-4xl font-bold">
+                {{ profile.username[0].upper() }}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-muted mb-2">Choose an image</label>
+                <input type="file" id="picture-input" accept="image/jpeg,image/png,image/webp"
+                       class="block w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-accent file:text-base hover:file:bg-accent/80 file:cursor-pointer cursor-pointer"
+                       onchange="previewProfilePicture(this)">
+                <p class="text-xs text-muted mt-1">JPG, PNG or WebP. Max 2MB.</p>
+            </div>
+        </div>
+
+        <div class="flex justify-between mt-6">
+            {% if profile.profile_picture_url %}
+            <button onclick="removeProfilePicture()" class="text-red-400 hover:text-red-300 text-sm">Remove Picture</button>
+            {% else %}
+            <div></div>
+            {% endif %}
+            <div class="flex gap-3">
+                <button onclick="closeProfilePictureModal()" class="btn-secondary text-sm">Cancel</button>
+                <button id="upload-picture-btn" onclick="uploadProfilePicture()" class="btn-primary text-sm" disabled>Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Spotify Beta Warning Modal -->
+<div id="spotify-beta-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-md mx-4">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-6 h-6 text-yellow-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L1 21h22L12 2zm0 3.5L19.5 19h-15L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+            </svg>
+            <h3 class="font-semibold text-lg">Beta Feature</h3>
+        </div>
+        <p class="text-muted mb-4">Spotify integration is currently in beta and only available to users who have been granted access.</p>
+        <p class="text-muted mb-6 text-sm">If you haven't been invited to the beta, connecting will fail. Contact the site admin if you'd like access.</p>
+        <div class="flex justify-end gap-3">
+            <button onclick="closeSpotifyBetaModal()" class="btn-secondary text-sm">Cancel</button>
+            <a href="{{ url_for('connect_spotify') }}" class="btn-spotify text-sm inline-flex items-center">
+                <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                Continue Anyway
+            </a>
+        </div>
+    </div>
+</div>
+
 <!-- Disconnect Spotify Confirmation Modal -->
 <div id="disconnect-spotify-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
     <div class="bg-surface border border-border rounded-lg p-6 w-full max-w-md mx-4">
@@ -1084,6 +1169,105 @@ function showToast(message) {
 let selectedSpotifyPlaylist = null;
 let userLists = [];
 
+// ============== PROFILE PICTURE FUNCTIONS ==============
+let selectedPictureFile = null;
+
+function openProfilePictureModal() {
+    document.getElementById('profile-picture-modal').classList.remove('hidden');
+}
+
+function closeProfilePictureModal() {
+    document.getElementById('profile-picture-modal').classList.add('hidden');
+    selectedPictureFile = null;
+    document.getElementById('picture-input').value = '';
+    document.getElementById('upload-picture-btn').disabled = true;
+}
+
+function previewProfilePicture(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Image must be less than 2MB');
+        input.value = '';
+        return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        alert('Please select a JPG, PNG, or WebP image');
+        input.value = '';
+        return;
+    }
+
+    selectedPictureFile = file;
+    document.getElementById('upload-picture-btn').disabled = false;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const container = document.getElementById('picture-preview-container');
+        container.innerHTML = `<img id="picture-preview" src="${e.target.result}" alt="Preview" class="w-32 h-32 rounded-full object-cover">`;
+    };
+    reader.readAsDataURL(file);
+}
+
+function uploadProfilePicture() {
+    if (!selectedPictureFile) return;
+
+    const btn = document.getElementById('upload-picture-btn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+
+    const formData = new FormData();
+    formData.append('picture', selectedPictureFile);
+
+    fetch('/api/profile/picture', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to upload picture');
+            btn.disabled = false;
+            btn.textContent = 'Upload';
+        }
+    })
+    .catch(() => {
+        alert('Failed to upload picture');
+        btn.disabled = false;
+        btn.textContent = 'Upload';
+    });
+}
+
+function removeProfilePicture() {
+    if (!confirm('Remove your profile picture?')) return;
+
+    fetch('/api/profile/picture', {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to remove picture');
+        }
+    });
+}
+
+function openSpotifyBetaModal() {
+    document.getElementById('spotify-beta-modal').classList.remove('hidden');
+}
+
+function closeSpotifyBetaModal() {
+    document.getElementById('spotify-beta-modal').classList.add('hidden');
+}
+
 function openDisconnectSpotifyModal() {
     document.getElementById('disconnect-spotify-modal').classList.remove('hidden');
 }
@@ -1260,6 +1444,12 @@ function escapeHtml(text) {
 }
 
 // Close modals on backdrop click
+document.getElementById('profile-picture-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeProfilePictureModal();
+});
+document.getElementById('spotify-beta-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeSpotifyBetaModal();
+});
 document.getElementById('disconnect-spotify-modal')?.addEventListener('click', function(e) {
     if (e.target === this) closeDisconnectSpotifyModal();
 });

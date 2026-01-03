@@ -1,36 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Jukebox{% endblock %}
+{% block title %}Sign In - Jukebox{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-cardbg rounded-lg shadow-lg p-8 border-t-4 border-dark">
-    <h1 class="text-2xl font-bold text-dark mb-6">Sign In</h1>
+<div class="max-w-sm mx-auto card p-6 mt-8">
+    <h1 class="text-xl font-bold mb-5">Sign In</h1>
 
     <form method="POST" class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Email</label>
-            <input type="email" name="email" required
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
+            <label class="block text-xs text-muted mb-1">Email</label>
+            <input type="email" name="email" required class="input-field">
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Password</label>
-            <input type="password" name="password" required
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
+            <label class="block text-xs text-muted mb-1">Password</label>
+            <input type="password" name="password" required class="input-field">
         </div>
 
         <div class="flex items-center">
-            <input type="checkbox" name="remember" id="remember" class="w-4 h-4 accent-dark">
-            <label for="remember" class="ml-2 text-sm text-dark">Remember me</label>
+            <input type="checkbox" name="remember" id="remember" class="w-4 h-4 accent-accent">
+            <label for="remember" class="ml-2 text-sm text-muted">Remember me</label>
         </div>
 
-        <button type="submit" class="w-full bg-accent text-white py-2 rounded font-semibold hover:bg-accenthover transition">
-            Sign In
-        </button>
+        <button type="submit" class="btn-primary w-full">Sign In</button>
     </form>
 
-    <p class="mt-4 text-center text-sm text-forest">
-        Don't have an account? <a href="{{ url_for('signup') }}" class="text-dark font-semibold hover:underline">Sign up</a>
+    <p class="mt-4 text-center text-sm text-muted">
+        Don't have an account? <a href="{{ url_for('signup') }}" class="text-accent hover:underline">Sign up</a>
     </p>
 </div>
 {% endblock %}

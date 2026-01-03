@@ -3,160 +3,127 @@
 {% block title %}Edit: {{ list.title }} - Jukebox{% endblock %}
 
 {% block content %}
-<div class="mb-8">
+<div class="mb-6">
     <div class="flex justify-between items-center">
-        <h1 id="list-title-display" class="text-3xl font-bold text-dark">{{ list.title }}</h1>
-        <div class="flex gap-4">
-            <button onclick="duplicateList()" class="text-forest font-medium hover:underline">Duplicate</button>
-            <a href="{{ url_for('view_list', list_id=list.id) }}" class="text-dark font-medium hover:underline">View List</a>
+        <h1 id="list-title-display" class="text-2xl font-bold">{{ list.title }}</h1>
+        <div class="flex gap-3">
+            <button onclick="duplicateList()" class="text-muted hover:text-white text-sm">Duplicate</button>
+            <a href="{{ url_for('view_list', list_id=list.id) }}" class="btn-secondary text-xs">View List</a>
         </div>
     </div>
 </div>
 
 <!-- List Settings -->
-<div class="bg-cardbg rounded-lg shadow-md p-6 mb-8">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold text-dark">List Settings</h2>
-        <span id="settings-status" class="text-sm text-forest hidden">Saved!</span>
+<div class="card p-4 mb-6">
+    <div class="flex justify-between items-center mb-3">
+        <h2 class="font-semibold">Settings</h2>
+        <span id="settings-status" class="text-xs text-accent hidden">Saved!</span>
     </div>
 
-    <div class="space-y-4">
+    <div class="grid gap-3">
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Title</label>
-            <input type="text" id="settings-title" value="{{ list.title }}"
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
+            <label class="block text-xs text-muted mb-1">Title</label>
+            <input type="text" id="settings-title" value="{{ list.title }}" class="input-field">
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Description</label>
-            <textarea id="settings-description" rows="2"
-                      class="w-full px-4 py-2 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">{{ list.description or '' }}</textarea>
+            <label class="block text-xs text-muted mb-1">Description</label>
+            <textarea id="settings-description" rows="2" class="input-field">{{ list.description or '' }}</textarea>
         </div>
 
-        <div class="flex gap-6">
-            <label class="flex items-center gap-2 cursor-pointer">
+        <div class="flex gap-5">
+            <label class="flex items-center gap-2 cursor-pointer text-sm">
                 <input type="checkbox" id="settings-public" {% if list.is_public %}checked{% endif %}
-                       class="w-4 h-4 accent-dark">
-                <span class="text-dark">Public</span>
+                       class="w-4 h-4 accent-accent">
+                <span>Public</span>
             </label>
 
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer text-sm">
                 <input type="checkbox" id="settings-ranked" {% if list.is_ranked %}checked{% endif %}
-                       class="w-4 h-4 accent-dark">
-                <span class="text-dark">Ranked</span>
+                       class="w-4 h-4 accent-accent">
+                <span>Ranked</span>
             </label>
         </div>
 
-        <div class="flex justify-between items-center">
-            <button onclick="saveSettings()" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
-                Save Settings
-            </button>
-            <button onclick="deleteList()" class="text-red-600 hover:text-red-800 text-sm font-medium">
-                Delete List
-            </button>
+        <div class="flex justify-between items-center pt-2">
+            <button onclick="saveSettings()" class="btn-primary text-xs">Save Settings</button>
+            <button onclick="deleteList()" class="text-danger hover:text-red-400 text-xs">Delete List</button>
         </div>
     </div>
 </div>
 
 <!-- Search Section -->
-<div class="bg-cardbg rounded-lg shadow-md p-6 mb-8 border-l-4 border-dark">
-    <h2 class="text-lg font-bold text-dark mb-4">Add Songs</h2>
+<div class="card p-4 mb-6">
+    <h2 class="font-semibold mb-3">Add Songs</h2>
 
-    <!-- Single Search -->
-    <div class="relative mb-4">
-        <input type="text" id="search-input"
-               class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
-               placeholder="Search for a song or artist...">
-        <div id="search-results" class="absolute z-10 w-full bg-cardbg border border-forest rounded-lg shadow-lg mt-1 hidden max-h-80 overflow-y-auto">
-        </div>
+    <div class="relative mb-3">
+        <input type="text" id="search-input" class="input-field" placeholder="Search for a song or artist...">
+        <div id="search-results" class="absolute z-10 w-full bg-elevated border border-border rounded mt-1 hidden max-h-72 overflow-y-auto"></div>
     </div>
 
-    <!-- Bulk Add Toggle -->
-    <button type="button" id="toggle-bulk" class="text-sm text-dark font-medium hover:underline mb-3">
-        + Bulk add multiple songs
-    </button>
+    <button type="button" id="toggle-bulk" class="text-xs text-muted hover:text-accent">+ Bulk add multiple songs</button>
 
-    <!-- Bulk Add Section (hidden by default) -->
-    <div id="bulk-section" class="hidden">
-        <textarea id="bulk-input" rows="6"
-                  class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark mb-3"
-                  placeholder="Paste song names here, one per line:&#10;Song Name - Artist&#10;Another Song - Another Artist&#10;Just Song Name"></textarea>
-        <div class="flex gap-3">
-            <button type="button" id="bulk-add-btn" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
-                Search & Add All
-            </button>
-            <button type="button" id="bulk-cancel" class="text-dark font-medium hover:underline">
-                Cancel
-            </button>
+    <div id="bulk-section" class="hidden mt-3">
+        <textarea id="bulk-input" rows="5" class="input-field mb-2" placeholder="Paste song names here, one per line"></textarea>
+        <div class="flex gap-2">
+            <button type="button" id="bulk-add-btn" class="btn-primary text-xs">Search & Add All</button>
+            <button type="button" id="bulk-cancel" class="text-muted hover:text-white text-xs">Cancel</button>
         </div>
-        <div id="bulk-status" class="mt-3 text-sm text-forest hidden"></div>
+        <div id="bulk-status" class="mt-2 text-xs text-muted hidden"></div>
     </div>
 </div>
 
 <!-- Swap Modal -->
-<div id="swap-modal" class="fixed inset-0 bg-dark bg-opacity-50 hidden z-50 flex items-center justify-center">
-    <div class="bg-cardbg rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-dark">Swap Song</h3>
-            <button onclick="closeSwapModal()" class="text-forest hover:text-dark text-xl">&times;</button>
+<div id="swap-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+    <div class="bg-surface border border-border rounded-lg p-5 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="font-semibold">Swap Song</h3>
+            <button onclick="closeSwapModal()" class="text-muted hover:text-white text-xl">&times;</button>
         </div>
-        <input type="text" id="swap-search-input"
-               class="w-full px-4 py-3 bg-khakilight border border-forest rounded-lg focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark mb-3"
-               placeholder="Search for the correct version...">
-        <div id="swap-search-results" class="max-h-64 overflow-y-auto">
-        </div>
+        <input type="text" id="swap-search-input" class="input-field mb-3" placeholder="Search for the correct version...">
+        <div id="swap-search-results" class="max-h-60 overflow-y-auto"></div>
     </div>
 </div>
 
 <!-- Current Items -->
-<div class="bg-cardbg rounded-lg shadow-md p-6">
-    <h2 class="text-lg font-bold text-dark mb-4">
-        Songs in List
-        <span class="text-sm font-normal text-forest">(<span id="item-count">{{ items|length }}</span> songs)</span>
+<div class="card p-4">
+    <h2 class="font-semibold mb-3">
+        Songs <span class="text-muted font-normal">(<span id="item-count">{{ items|length }}</span>)</span>
     </h2>
 
     <div id="items-container">
         {% if items %}
             {% for item in items %}
-            <div class="flex items-center gap-4 py-3 border-b border-khaki item-row cursor-grab active:cursor-grabbing" data-id="{{ item.id }}">
-                <!-- Drag Handle -->
-                <div class="drag-handle text-forest hover:text-dark px-1">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <div class="flex items-center gap-3 py-2 border-b border-border item-row" data-id="{{ item.id }}">
+                <div class="drag-handle text-muted hover:text-white cursor-grab active:cursor-grabbing">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
                     </svg>
                 </div>
 
                 {% if list.is_ranked %}
-                <div class="w-8 text-center font-bold text-dark position-display">{{ item.position }}</div>
+                <div class="w-6 text-center text-sm font-medium text-accent position-display">{{ item.position }}</div>
                 {% endif %}
 
-                <img src="{{ item.album_art_url or '' }}" alt=""
-                     class="w-12 h-12 rounded object-cover {% if not item.album_art_url %}bg-khaki{% endif %}">
+                <img src="{{ item.album_art_url or '' }}" alt="" class="w-10 h-10 rounded object-cover bg-elevated">
 
                 <div class="flex-1 min-w-0">
-                    <p class="font-medium text-dark truncate">{{ item.track_name }}</p>
-                    <p class="text-sm text-forest truncate">{{ item.artist_name }}</p>
+                    <p class="text-sm font-medium truncate">{{ item.track_name }}</p>
+                    <p class="text-xs text-muted truncate">{{ item.artist_name }}</p>
                 </div>
 
-                <button onclick="swapItem('{{ item.id }}', '{{ item.track_name }}')"
-                        class="text-forest hover:text-dark px-2 py-1 font-medium transition text-sm">
-                    Swap
-                </button>
-                <button onclick="removeItem('{{ item.id }}')"
-                        class="text-brown hover:text-red-600 px-2 py-1 font-medium transition text-sm">
-                    Remove
-                </button>
+                <button onclick="swapItem('{{ item.id }}', '{{ item.track_name }}')" class="text-muted hover:text-accent text-xs">Swap</button>
+                <button onclick="removeItem('{{ item.id }}')" class="text-muted hover:text-danger text-xs">Remove</button>
             </div>
             {% endfor %}
         {% else %}
-            <p id="empty-message" class="text-forest text-center py-8">No songs yet. Search above to add some!</p>
+            <p id="empty-message" class="text-muted text-center py-6 text-sm">No songs yet. Search above to add some!</p>
         {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<!-- SortableJS for drag and drop -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 const listId = "{{ list.id }}";
@@ -168,7 +135,6 @@ const searchResults = document.getElementById('search-results');
 const itemsContainer = document.getElementById('items-container');
 const itemCount = document.getElementById('item-count');
 
-// Bulk add elements
 const toggleBulk = document.getElementById('toggle-bulk');
 const bulkSection = document.getElementById('bulk-section');
 const bulkInput = document.getElementById('bulk-input');
@@ -176,7 +142,6 @@ const bulkAddBtn = document.getElementById('bulk-add-btn');
 const bulkCancel = document.getElementById('bulk-cancel');
 const bulkStatus = document.getElementById('bulk-status');
 
-// Toggle bulk section
 toggleBulk.addEventListener('click', () => {
     bulkSection.classList.toggle('hidden');
     toggleBulk.textContent = bulkSection.classList.contains('hidden') ? '+ Bulk add multiple songs' : '− Hide bulk add';
@@ -189,10 +154,8 @@ bulkCancel.addEventListener('click', () => {
     bulkStatus.classList.add('hidden');
 });
 
-// Helper to add delay between requests
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// Bulk add functionality
 bulkAddBtn.addEventListener('click', async () => {
     const lines = bulkInput.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length === 0) {
@@ -213,84 +176,50 @@ bulkAddBtn.addEventListener('click', async () => {
         bulkStatus.textContent = `Searching ${i + 1}/${lines.length}: "${query}"...`;
 
         try {
-            // Search for the song
             const searchRes = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`);
-
-            if (!searchRes.ok) {
-                failed.push(query + ' (search error)');
-                await delay(200);
-                continue;
-            }
+            if (!searchRes.ok) { failed.push(query); await delay(200); continue; }
 
             const data = await searchRes.json();
-
             if (data.tracks && data.tracks.length > 0) {
-                const track = data.tracks[0]; // Take first result
-
-                // Add to list
+                const track = data.tracks[0];
                 const addRes = await fetch(`/api/list/${listId}/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        track_id: track.id,
-                        track_name: track.name,
-                        artist_name: track.artist,
-                        album_name: track.album,
-                        album_art_url: track.album_art
+                        track_id: track.id, track_name: track.name, artist_name: track.artist,
+                        album_name: track.album, album_art_url: track.album_art
                     })
                 });
                 const addData = await addRes.json();
-
-                if (addData.success && addData.item) {
-                    addItemToDOM(addData.item);
-                    added++;
-                } else {
-                    failed.push(query + ' (add error)');
-                }
-            } else {
-                failed.push(query);
-            }
-
-            // Small delay to avoid rate limiting
+                if (addData.success && addData.item) { addItemToDOM(addData.item); added++; }
+                else { failed.push(query); }
+            } else { failed.push(query); }
             await delay(150);
-        } catch (e) {
-            console.error('Bulk add error:', e);
-            failed.push(query + ' (error)');
-        }
+        } catch (e) { failed.push(query); }
     }
 
     bulkAddBtn.disabled = false;
     bulkAddBtn.textContent = 'Search & Add All';
-
     let statusMsg = `Added ${added} song${added !== 1 ? 's' : ''}.`;
-    if (failed.length > 0) {
-        statusMsg += ` Failed: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '...' : ''}`;
-    }
+    if (failed.length > 0) statusMsg += ` Failed: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`;
     bulkStatus.textContent = statusMsg;
     if (added > 0) bulkInput.value = '';
 });
 
-// Initialize SortableJS for drag and drop
 const sortable = new Sortable(itemsContainer, {
     animation: 150,
     handle: '.drag-handle',
-    ghostClass: 'bg-khakilight',
+    ghostClass: 'opacity-50',
     onEnd: function(evt) {
-        // Update positions after drag
         const rows = itemsContainer.querySelectorAll('.item-row');
         const newOrder = [];
-
         rows.forEach((row, index) => {
             const itemId = row.dataset.id;
             const newPosition = index + 1;
             newOrder.push({ item_id: itemId, position: newPosition });
-
-            // Update displayed position
             const posDisplay = row.querySelector('.position-display');
             if (posDisplay) posDisplay.textContent = newPosition;
         });
-
-        // Send reorder request
         fetch(`/api/list/${listId}/reorder-all`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -299,15 +228,10 @@ const sortable = new Sortable(itemsContainer, {
     }
 });
 
-// Search functionality
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
     const query = this.value.trim();
-
-    if (query.length < 2) {
-        searchResults.classList.add('hidden');
-        return;
-    }
+    if (query.length < 2) { searchResults.classList.add('hidden'); return; }
 
     searchTimeout = setTimeout(() => {
         fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`)
@@ -315,26 +239,24 @@ searchInput.addEventListener('input', function() {
             .then(data => {
                 if (data.tracks && data.tracks.length > 0) {
                     searchResults.innerHTML = data.tracks.map(track => `
-                        <div class="flex items-center gap-3 p-3 hover:bg-khakilight cursor-pointer transition"
-                             onclick="addTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
-                            <img src="${track.album_art || ''}" alt="" class="w-10 h-10 rounded object-cover">
+                        <div class="flex items-center gap-3 p-3 hover:bg-surface cursor-pointer" onclick="addTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
+                            <img src="${track.album_art || ''}" alt="" class="w-9 h-9 rounded object-cover bg-elevated">
                             <div class="flex-1 min-w-0">
-                                <p class="font-medium text-dark truncate">${track.name}</p>
-                                <p class="text-sm text-forest truncate">${track.artist}</p>
+                                <p class="text-sm font-medium truncate">${track.name}</p>
+                                <p class="text-xs text-muted truncate">${track.artist}</p>
                             </div>
-                            <span class="text-dark font-semibold text-sm">+ Add</span>
+                            <span class="text-accent text-xs font-medium">+ Add</span>
                         </div>
                     `).join('');
                     searchResults.classList.remove('hidden');
                 } else {
-                    searchResults.innerHTML = '<p class="p-4 text-forest">No results found</p>';
+                    searchResults.innerHTML = '<p class="p-3 text-muted text-sm">No results found</p>';
                     searchResults.classList.remove('hidden');
                 }
             });
     }, 300);
 });
 
-// Click outside to close search
 document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
         searchResults.classList.add('hidden');
@@ -342,32 +264,24 @@ document.addEventListener('click', function(e) {
 });
 
 function addItemToDOM(item) {
-    // Remove empty message if present
     const emptyMsg = document.getElementById('empty-message');
     if (emptyMsg) emptyMsg.remove();
 
     const html = `
-        <div class="flex items-center gap-4 py-3 border-b border-khaki item-row cursor-grab active:cursor-grabbing" data-id="${item.id}">
-            <div class="drag-handle text-forest hover:text-dark px-1">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <div class="flex items-center gap-3 py-2 border-b border-border item-row" data-id="${item.id}">
+            <div class="drag-handle text-muted hover:text-white cursor-grab active:cursor-grabbing">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
                 </svg>
             </div>
-            ${isRanked ? `<div class="w-8 text-center font-bold text-dark position-display">${item.position}</div>` : ''}
-            <img src="${item.album_art_url || ''}" alt=""
-                 class="w-12 h-12 rounded object-cover ${!item.album_art_url ? 'bg-khaki' : ''}">
+            ${isRanked ? `<div class="w-6 text-center text-sm font-medium text-accent position-display">${item.position}</div>` : ''}
+            <img src="${item.album_art_url || ''}" alt="" class="w-10 h-10 rounded object-cover bg-elevated">
             <div class="flex-1 min-w-0">
-                <p class="font-medium text-dark truncate">${item.track_name}</p>
-                <p class="text-sm text-forest truncate">${item.artist_name}</p>
+                <p class="text-sm font-medium truncate">${item.track_name}</p>
+                <p class="text-xs text-muted truncate">${item.artist_name}</p>
             </div>
-            <button onclick="swapItem('${item.id}', '${item.track_name.replace(/'/g, "\\'")}')"
-                    class="text-forest hover:text-dark px-2 py-1 font-medium transition text-sm">
-                Swap
-            </button>
-            <button onclick="removeItem('${item.id}')"
-                    class="text-brown hover:text-red-600 px-2 py-1 font-medium transition text-sm">
-                Remove
-            </button>
+            <button onclick="swapItem('${item.id}', '${item.track_name.replace(/'/g, "\\'")}')" class="text-muted hover:text-accent text-xs">Swap</button>
+            <button onclick="removeItem('${item.id}')" class="text-muted hover:text-danger text-xs">Remove</button>
         </div>
     `;
     itemsContainer.insertAdjacentHTML('beforeend', html);
@@ -379,11 +293,8 @@ function addTrack(track) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            track_id: track.id,
-            track_name: track.name,
-            artist_name: track.artist,
-            album_name: track.album,
-            album_art_url: track.album_art
+            track_id: track.id, track_name: track.name, artist_name: track.artist,
+            album_name: track.album, album_art_url: track.album_art
         })
     })
     .then(res => res.json())
@@ -398,7 +309,6 @@ function addTrack(track) {
 
 function removeItem(itemId) {
     if (!confirm('Remove this song?')) return;
-
     fetch(`/api/list/${listId}/remove/${itemId}`, { method: 'DELETE' })
         .then(res => res.json())
         .then(data => {
@@ -414,7 +324,6 @@ function updateItemCount(delta) {
     itemCount.textContent = current + delta;
 }
 
-// Swap functionality
 const swapModal = document.getElementById('swap-modal');
 const swapSearchInput = document.getElementById('swap-search-input');
 const swapSearchResults = document.getElementById('swap-search-results');
@@ -427,7 +336,6 @@ function swapItem(itemId, trackName) {
     swapSearchResults.innerHTML = '';
     swapModal.classList.remove('hidden');
     swapSearchInput.focus();
-    // Trigger search immediately
     doSwapSearch(trackName);
 }
 
@@ -439,28 +347,24 @@ function closeSwapModal() {
 }
 
 function doSwapSearch(query) {
-    if (query.length < 2) {
-        swapSearchResults.innerHTML = '';
-        return;
-    }
+    if (query.length < 2) { swapSearchResults.innerHTML = ''; return; }
 
     fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`)
         .then(res => res.json())
         .then(data => {
             if (data.tracks && data.tracks.length > 0) {
                 swapSearchResults.innerHTML = data.tracks.map(track => `
-                    <div class="flex items-center gap-3 p-3 hover:bg-khakilight cursor-pointer transition border-b border-khaki"
-                         onclick="selectSwapTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
-                        <img src="${track.album_art || ''}" alt="" class="w-10 h-10 rounded object-cover">
+                    <div class="flex items-center gap-3 p-3 hover:bg-elevated cursor-pointer border-b border-border" onclick="selectSwapTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
+                        <img src="${track.album_art || ''}" alt="" class="w-9 h-9 rounded object-cover bg-elevated">
                         <div class="flex-1 min-w-0">
-                            <p class="font-medium text-dark truncate">${track.name}</p>
-                            <p class="text-sm text-forest truncate">${track.artist}</p>
-                            <p class="text-xs text-brown truncate">${track.album}</p>
+                            <p class="text-sm font-medium truncate">${track.name}</p>
+                            <p class="text-xs text-muted truncate">${track.artist}</p>
+                            <p class="text-xs text-muted/60 truncate">${track.album}</p>
                         </div>
                     </div>
                 `).join('');
             } else {
-                swapSearchResults.innerHTML = '<p class="p-4 text-forest">No results found</p>';
+                swapSearchResults.innerHTML = '<p class="p-3 text-muted text-sm">No results found</p>';
             }
         });
 }
@@ -472,31 +376,19 @@ swapSearchInput.addEventListener('input', function() {
 
 function selectSwapTrack(track) {
     if (!currentSwapItemId) return;
+    swapSearchResults.innerHTML = '<p class="p-3 text-muted text-sm">Saving...</p>';
 
-    // Show loading state
-    swapSearchResults.innerHTML = '<p class="p-4 text-forest">Saving...</p>';
-
-    // Update the item in the database
     fetch(`/api/list/${listId}/update/${currentSwapItemId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            track_id: track.id,
-            track_name: track.name,
-            artist_name: track.artist,
-            album_name: track.album,
-            album_art_url: track.album_art
+            track_id: track.id, track_name: track.name, artist_name: track.artist,
+            album_name: track.album, album_art_url: track.album_art
         })
     })
-    .then(res => {
-        if (!res.ok) {
-            throw new Error('Failed to save');
-        }
-        return res.json();
-    })
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Update the DOM - find the correct elements within the row
             const row = document.querySelector(`.item-row[data-id="${currentSwapItemId}"]`);
             if (row) {
                 const img = row.querySelector('img');
@@ -516,94 +408,59 @@ function selectSwapTrack(track) {
         }
     })
     .catch(err => {
-        console.error('Swap error:', err);
         alert('Error saving swap. Please try again.');
         closeSwapModal();
     });
 }
 
-// Close modal on background click
 swapModal.addEventListener('click', function(e) {
     if (e.target === swapModal) closeSwapModal();
 });
 
-// Settings functionality
 function saveSettings() {
     const title = document.getElementById('settings-title').value.trim();
     const description = document.getElementById('settings-description').value.trim();
     const isPublic = document.getElementById('settings-public').checked;
-    const isRanked = document.getElementById('settings-ranked').checked;
+    const newIsRanked = document.getElementById('settings-ranked').checked;
 
-    if (!title) {
-        alert('Title is required');
-        return;
-    }
+    if (!title) { alert('Title is required'); return; }
 
     fetch(`/api/list/${listId}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            title: title,
-            description: description,
-            is_public: isPublic,
-            is_ranked: isRanked
-        })
+        body: JSON.stringify({ title, description, is_public: isPublic, is_ranked: newIsRanked })
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Update page title
             document.getElementById('list-title-display').textContent = title;
             document.title = `Edit: ${title} - Jukebox`;
-
-            // Show saved status
             const status = document.getElementById('settings-status');
             status.classList.remove('hidden');
             setTimeout(() => status.classList.add('hidden'), 2000);
-
-            // Reload if ranked status changed to update UI
-            if (isRanked !== {{ 'true' if list.is_ranked else 'false' }}) {
-                location.reload();
-            }
+            if (newIsRanked !== isRanked) location.reload();
         }
     });
 }
 
-// Duplicate list
 function duplicateList() {
     if (!confirm('Create a copy of this list?')) return;
-
-    fetch(`/api/list/${listId}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
+    fetch(`/api/list/${listId}/duplicate`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
     .then(res => res.json())
     .then(data => {
-        if (data.success && data.new_list_id) {
-            window.location.href = `/list/${data.new_list_id}/edit`;
-        } else {
-            alert('Failed to duplicate list');
-        }
+        if (data.success && data.new_list_id) window.location.href = `/list/${data.new_list_id}/edit`;
+        else alert('Failed to duplicate list');
     });
 }
 
-// Delete list
 function deleteList() {
     if (!confirm('Are you sure you want to delete this list? This cannot be undone.')) return;
-
-    fetch(`/api/list/${listId}/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-    })
+    fetch(`/api/list/${listId}/delete`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            window.location.href = '/dashboard';
-        } else {
-            alert('Failed to delete list');
-        }
+        if (data.success) window.location.href = '/dashboard';
+        else alert('Failed to delete list');
     });
 }
-
 </script>
 {% endblock %}

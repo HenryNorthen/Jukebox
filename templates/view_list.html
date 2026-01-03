@@ -3,33 +3,31 @@
 {% block title %}{{ list.title }} - Jukebox{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <div class="flex justify-between items-start">
+<div class="mb-6">
+    <div class="flex justify-between items-start gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-dark">{{ list.title }}</h1>
-            <p class="text-forest mt-1">
-                by <a href="{{ url_for('user_profile', username=list.profiles.username) }}" class="text-dark font-medium hover:underline">{{ list.profiles.username if list.profiles else 'Unknown' }}</a>
-                {% if list.is_ranked %}<span class="text-khaki mx-2">|</span> <span class="text-forest">Ranked</span>{% endif %}
-                <span class="text-khaki mx-2">|</span> <span class="text-forest">{{ items|length }} song{{ 's' if items|length != 1 else '' }}</span>
-                <span class="text-khaki mx-2">|</span> <span class="text-forest">Created {{ list.created_at[:10] }}</span>
+            <h1 class="text-2xl font-bold">{{ list.title }}</h1>
+            <p class="text-sm text-muted mt-1">
+                by <a href="{{ url_for('user_profile', username=list.profiles.username) }}" class="text-accent hover:underline">{{ list.profiles.username if list.profiles else 'Unknown' }}</a>
+                <span class="mx-1">·</span>
+                {{ items|length }} song{{ 's' if items|length != 1 else '' }}
+                {% if list.is_ranked %}<span class="mx-1">·</span> Ranked{% endif %}
+                <span class="mx-1">·</span>
+                {{ list.created_at[:10] }}
             </p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex gap-2 flex-shrink-0">
             {% if session.user %}
-            <button onclick="duplicateList()" class="text-forest font-medium hover:underline">
-                Copy List
-            </button>
+            <button onclick="duplicateList()" class="btn-secondary text-xs">Copy</button>
             {% endif %}
             {% if is_owner %}
-            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="bg-dark text-khaki px-4 py-2 rounded font-semibold hover:bg-forest transition">
-                Edit List
-            </a>
+            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="btn-primary text-xs">Edit List</a>
             {% endif %}
         </div>
     </div>
 
     {% if list.description %}
-        <p class="text-forest mt-4 max-w-2xl">{{ list.description }}</p>
+        <p class="text-muted text-sm mt-3 max-w-2xl">{{ list.description }}</p>
     {% endif %}
 </div>
 
@@ -40,8 +38,8 @@
             {% if item.album_art_url %}
                 <img src="{{ item.album_art_url }}" alt="{{ item.album_name }}" draggable="false">
             {% else %}
-                <div class="w-full h-full bg-khaki flex items-center justify-center">
-                    <span class="text-4xl text-dark">&#9835;</span>
+                <div class="w-full h-full bg-elevated flex items-center justify-center">
+                    <span class="text-3xl text-muted">♪</span>
                 </div>
             {% endif %}
 
@@ -50,20 +48,18 @@
             {% endif %}
 
             <!-- Hover overlay -->
-            <div class="absolute inset-0 bg-dark bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                <p class="text-khaki font-bold text-sm truncate">{{ item.track_name }}</p>
-                <p class="text-khakilight text-xs truncate">{{ item.artist_name }}</p>
+            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                <p class="text-white font-medium text-sm truncate">{{ item.track_name }}</p>
+                <p class="text-muted text-xs truncate">{{ item.artist_name }}</p>
             </div>
         </div>
         {% endfor %}
     </div>
 {% else %}
-    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
-        <p class="text-xl text-forest">This list is empty</p>
+    <div class="card text-center py-12">
+        <p class="text-muted">This list is empty</p>
         {% if is_owner %}
-            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="inline-block mt-4 bg-dark text-khaki px-6 py-2 rounded font-semibold hover:bg-forest transition">
-                Add songs
-            </a>
+            <a href="{{ url_for('edit_list', list_id=list.id) }}" class="btn-primary mt-4 inline-block">Add songs</a>
         {% endif %}
     </div>
 {% endif %}
@@ -73,7 +69,6 @@
 <script>
 const listId = "{{ list.id }}";
 
-// Duplicate list
 function duplicateList() {
     if (!confirm('Create a copy of this list to your account?')) return;
 
@@ -95,16 +90,13 @@ function duplicateList() {
 {% if is_owner and items %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
-
 const albumGrid = document.getElementById('album-grid');
 new Sortable(albumGrid, {
     animation: 150,
     ghostClass: 'opacity-50',
     onEnd: function(evt) {
-        // Update rank badges if this is a ranked list
         updateRankBadges();
 
-        // Get new order and save to server
         const items = albumGrid.querySelectorAll('.album-tile');
         const order = Array.from(items).map((item, index) => ({
             item_id: item.dataset.id,

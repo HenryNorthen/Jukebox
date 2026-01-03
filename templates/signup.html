@@ -3,38 +3,33 @@
 {% block title %}Sign Up - Jukebox{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-cardbg rounded-lg shadow-lg p-8 border-t-4 border-dark">
-    <h1 class="text-2xl font-bold text-dark mb-6">Join Jukebox</h1>
+<div class="max-w-sm mx-auto card p-6 mt-8">
+    <h1 class="text-xl font-bold mb-5">Join Jukebox</h1>
 
     <form method="POST" class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Username</label>
+            <label class="block text-xs text-muted mb-1">Username</label>
             <input type="text" name="username" required pattern="[a-zA-Z0-9_]+" minlength="3"
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark"
-                   placeholder="coolmusicfan">
-            <p class="text-xs text-forest mt-1">Letters, numbers, underscores only</p>
+                   class="input-field" placeholder="coolmusicfan">
+            <p class="text-xs text-muted mt-1">Letters, numbers, underscores only</p>
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Email</label>
-            <input type="email" name="email" required
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
+            <label class="block text-xs text-muted mb-1">Email</label>
+            <input type="email" name="email" required class="input-field">
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-dark mb-1">Password</label>
-            <input type="password" name="password" required minlength="6"
-                   class="w-full px-4 py-2 bg-khakilight border border-forest rounded focus:outline-none focus:border-dark focus:ring-1 focus:ring-dark">
-            <p class="text-xs text-forest mt-1">At least 6 characters</p>
+            <label class="block text-xs text-muted mb-1">Password</label>
+            <input type="password" name="password" required minlength="6" class="input-field">
+            <p class="text-xs text-muted mt-1">At least 6 characters</p>
         </div>
 
-        <button type="submit" class="w-full bg-dark text-khaki py-2 rounded font-semibold hover:bg-forest transition">
-            Create Account
-        </button>
+        <button type="submit" class="btn-primary w-full">Create Account</button>
     </form>
 
-    <p class="mt-4 text-center text-sm text-forest">
-        Already have an account? <a href="{{ url_for('login') }}" class="text-dark font-semibold hover:underline">Sign in</a>
+    <p class="mt-4 text-center text-sm text-muted">
+        Already have an account? <a href="{{ url_for('login') }}" class="text-accent hover:underline">Sign in</a>
     </p>
 </div>
 {% endblock %}

@@ -5,100 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Jukebox{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        dark: '#1a3a2f',
-                        forest: '#4C6444',
-                        khaki: '#CABA9C',
-                        khakilight: '#D9CEBD',
-                        khakibg: '#E8E0D0',
-                        brown: '#8A6240',
-                        coffee: '#4D2D18',
-                        cardbg: '#F5EFE4',
-                        accent: '#C4704A',
-                        accenthover: '#A85D3B',
-                    },
-                    fontFamily: {
-                        'display': ['EB Garamond', 'Georgia', 'serif'],
-                        'ui': ['Inter', 'system-ui', 'sans-serif'],
+                        base: '#14181c',
+                        surface: '#1c2228',
+                        elevated: '#242c34',
+                        border: '#2c3440',
+                        muted: '#99aabb',
+                        accent: '#00c853',
+                        accentHover: '#00e676',
+                        danger: '#ef4444',
                     }
                 }
             }
         }
     </script>
     <style>
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-        }
-        h1, h2, h3, .font-display {
-            font-family: 'EB Garamond', Georgia, serif;
-        }
+        * { font-family: 'Inter', system-ui, sans-serif; }
+
         .album-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+        @media (min-width: 768px) {
+            .album-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 1rem;
+            }
         }
         @media (min-width: 1024px) {
             .album-grid {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             }
         }
+
         .album-tile {
             aspect-ratio: 1;
             position: relative;
             overflow: hidden;
             border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .album-tile:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            background: #242c34;
         }
         .album-tile img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: opacity 0.2s;
         }
+        .album-tile:hover img {
+            opacity: 0.7;
+        }
+
         .rank-badge {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(16, 40, 32, 0.9);
-            color: #CABA9C;
-            font-size: 0.75rem;
-            font-weight: bold;
-            padding: 2px 8px;
+            top: 6px;
+            left: 6px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00c853;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .btn-primary {
+            background: #00c853;
+            color: #14181c;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
             border-radius: 4px;
+            font-size: 0.875rem;
+            transition: background 0.15s;
+        }
+        .btn-primary:hover { background: #00e676; }
+
+        .btn-secondary {
+            background: transparent;
+            color: #99aabb;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border: 1px solid #2c3440;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            transition: all 0.15s;
+        }
+        .btn-secondary:hover {
+            border-color: #99aabb;
+            color: #fff;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            background: #1c2228;
+            border: 1px solid #2c3440;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.875rem;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #00c853;
+        }
+        .input-field::placeholder { color: #667788; }
+
+        .card {
+            background: #1c2228;
+            border: 1px solid #2c3440;
+            border-radius: 6px;
         }
     </style>
 </head>
-<body class="bg-khakibg min-h-screen text-dark">
-    <nav class="bg-khaki border-b-2 border-dark">
-        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="{{ url_for('index') }}" class="text-2xl font-bold text-dark tracking-wide font-display">Jukebox</a>
+<body class="bg-base min-h-screen text-white">
+    <nav class="bg-surface border-b border-border">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="{{ url_for('index') }}" class="text-xl font-bold text-accent tracking-tight">Jukebox</a>
             <div class="flex items-center gap-4">
                 {% if session.user %}
-                    <a href="{{ url_for('dashboard') }}" class="text-dark hover:text-forest transition text-sm font-medium">My Lists</a>
-                    <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-4 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">+ New List</a>
-                    <a href="{{ url_for('logout') }}" class="text-dark hover:text-forest transition text-sm">Logout</a>
+                    <a href="{{ url_for('dashboard') }}" class="text-muted hover:text-white transition text-sm">My Lists</a>
+                    <a href="{{ url_for('create_list') }}" class="btn-primary text-xs">+ New List</a>
+                    <a href="{{ url_for('logout') }}" class="text-muted hover:text-white transition text-sm">Logout</a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="text-dark hover:text-forest transition text-sm font-medium">Login</a>
-                    <a href="{{ url_for('signup') }}" class="bg-accent text-white px-4 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">Sign Up</a>
+                    <a href="{{ url_for('login') }}" class="text-muted hover:text-white transition text-sm">Sign In</a>
+                    <a href="{{ url_for('signup') }}" class="btn-primary text-xs">Create Account</a>
                 {% endif %}
             </div>
         </div>
     </nav>
 
-    <main class="max-w-6xl mx-auto px-4 py-8">
+    <main class="max-w-6xl mx-auto px-4 py-6">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="mb-4 p-4 rounded {% if category == 'error' %}bg-red-200 text-red-800{% else %}bg-green-200 text-green-800{% endif %}">
+                    <div class="mb-4 px-4 py-3 rounded text-sm {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-green-900/50 text-green-300 border border-green-800{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}

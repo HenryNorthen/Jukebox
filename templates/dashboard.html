@@ -3,59 +3,61 @@
 {% block title %}My Lists - Jukebox{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-8">
-    <h1 class="text-3xl font-bold text-dark">My Lists</h1>
-    <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-6 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">
-        + New List
-    </a>
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">My Lists</h1>
+    <a href="{{ url_for('create_list') }}" class="btn-primary text-sm">+ New List</a>
 </div>
 
 {% if lists %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for list in lists %}
-        <div class="bg-cardbg rounded-lg shadow-md overflow-hidden border-l-4 border-dark">
-            <a href="{{ url_for('view_list', list_id=list.id) }}" class="block p-5 hover:bg-khakilight transition">
+        <div class="card overflow-hidden">
+            <a href="{{ url_for('view_list', list_id=list.id) }}" class="block p-4 hover:bg-elevated transition">
                 <!-- Album art preview -->
                 {% if list.preview_images %}
                 <div class="flex gap-1 mb-3">
                     {% for img in list.preview_images[:4] %}
-                    <div class="w-12 h-12 rounded overflow-hidden shadow-sm">
+                    <div class="w-12 h-12 rounded overflow-hidden bg-elevated">
                         <img src="{{ img }}" alt="" class="w-full h-full object-cover">
                     </div>
                     {% endfor %}
                     {% if list.item_count > 4 %}
-                    <div class="w-12 h-12 rounded bg-dark flex items-center justify-center">
-                        <span class="text-khaki text-xs font-bold">+{{ list.item_count - 4 }}</span>
+                    <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                        <span class="text-muted text-xs font-medium">+{{ list.item_count - 4 }}</span>
                     </div>
                     {% endif %}
                 </div>
+                {% else %}
+                <div class="flex gap-1 mb-3">
+                    <div class="w-12 h-12 rounded bg-elevated flex items-center justify-center">
+                        <span class="text-muted text-lg">♪</span>
+                    </div>
+                </div>
                 {% endif %}
 
-                <div class="flex justify-between items-start">
-                    <h3 class="text-lg font-bold text-dark">{{ list.title }}</h3>
-                    <span class="text-xs px-2 py-1 rounded {% if list.is_public %}bg-dark text-khaki{% else %}bg-khaki text-dark{% endif %}">
+                <div class="flex justify-between items-start gap-2">
+                    <h3 class="font-semibold text-white leading-tight">{{ list.title }}</h3>
+                    <span class="text-xs px-2 py-0.5 rounded {% if list.is_public %}bg-accent/20 text-accent{% else %}bg-elevated text-muted{% endif %} flex-shrink-0">
                         {{ 'Public' if list.is_public else 'Private' }}
                     </span>
                 </div>
                 {% if list.description %}
-                    <p class="text-sm text-forest mt-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
+                    <p class="text-sm text-muted mt-1 line-clamp-2">{{ list.description[:80] }}{% if list.description|length > 80 %}...{% endif %}</p>
                 {% endif %}
-                <p class="text-xs text-forest mt-3 font-medium">
+                <p class="text-xs text-muted mt-2">
                     {{ list.item_count }} song{{ 's' if list.item_count != 1 else '' }} · {{ 'Ranked' if list.is_ranked else 'Unranked' }}
                 </p>
             </a>
-            <div class="border-t border-khaki px-5 py-3 bg-khakilight">
-                <a href="{{ url_for('edit_list', list_id=list.id) }}" class="text-sm text-dark font-medium hover:underline">Edit</a>
+            <div class="border-t border-border px-4 py-2 bg-elevated/50">
+                <a href="{{ url_for('edit_list', list_id=list.id) }}" class="text-xs text-muted hover:text-accent transition">Edit</a>
             </div>
         </div>
         {% endfor %}
     </div>
 {% else %}
-    <div class="text-center py-16 bg-cardbg rounded-lg shadow-md">
-        <p class="text-xl text-forest mb-4">You haven't created any lists yet</p>
-        <a href="{{ url_for('create_list') }}" class="bg-accent text-white px-6 py-2 rounded font-semibold hover:bg-accenthover transition text-sm">
-            Create your first list
-        </a>
+    <div class="card text-center py-12 px-6">
+        <p class="text-muted mb-4">You haven't created any lists yet</p>
+        <a href="{{ url_for('create_list') }}" class="btn-primary">Create your first list</a>
     </div>
 {% endif %}
 {% endblock %}

@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Jukeboxd{% endblock %}</title>
+
+    <title>{% block title %}Jukeboxd — Create, Rank &amp; Share Music Lists{% endblock %}</title>
+
+    <meta name="description" content="{% block description %}Create, rank, and share music lists like Top 100 songs of all time. Jukeboxd is a Letterboxd-style platform for music rankings and discovery.{% endblock %}">
+
+    <link rel="canonical" href="https://jukeboxd.net{{ request.path or '/' }}">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>

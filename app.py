@@ -9,6 +9,7 @@ import urllib.parse
 import requests
 import base64
 import time
+from flask import Response
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -1974,3 +1975,23 @@ if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=debug_mode, host='0.0.0.0', port=port)
+
+@app.route("/sitemap.xml")
+def sitemap():
+    pages = ["https://jukeboxd.net/"]
+
+    # Add public list URLs (adjust table/field names if yours differ)
+    try:
+        resp = supabase.table("lists").select("id").eq("is_public", True).execute()
+        for row in (resp.data or []):
+            pages.append(f"https://jukeboxd.net/list/{row['id']}")
+    except Exception:
+        pass
+
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for url in pages:
+        xml.append(f"<url><loc>{url}</loc></url>")
+    xml.append("</urlset>")
+
+    return Response("\n".join(xml), mimetype="application/xml")

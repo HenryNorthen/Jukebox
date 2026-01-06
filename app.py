@@ -10,9 +10,18 @@ import requests
 import base64
 import time
 from flask import Response, send_from_directory
+import re
 
 
 app = Flask(__name__)
+UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+def slugify(title: str) -> str:
+    s = title.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    s = re.sub(r"(^-+|-+$)", "", s)
+    return s or "list"
+
 app.config.from_object(Config)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
@@ -354,9 +363,20 @@ def create_list():
                 'is_ranked': is_ranked,
                 'is_public': is_public
             }).execute()
-
             if result.data:
-                return redirect(url_for('edit_list', list_id=result.data[0]['id']))
+                new_id = result.data[0]['id']
+                base = slugify(title or "")
+
+                # Ensure uniqueness by appending a short id suffix
+                slug = f"{base}-{str(new_id).replace('-', '')[:6]}"
+
+                try:
+                    supabase.table('lists').update({'slug': slug}).eq('id', new_id).execute()
+                except Exception:
+                    pass
+
+                return redirect(url_for('edit_list', list_id=new_id))
+
             else:
                 flash('Failed to create list', 'error')
         except Exception as e:
@@ -365,17 +385,38 @@ def create_list():
     return render_template('create_list.html')
 
 
-@app.route('/list/<list_id>')
-def view_list(list_id):
-    """View a list (public or own)."""
-    # Get list
-    list_result = supabase.table('lists').select('*, profiles(username)').eq('id', list_id).single().execute()
+@app.route('/list/<identifier>')
+def view_list(identifier):
+    """View a list (public or own) by UUID or slug. Redirect UUID -> slug when available."""
+    lst = None
+    list_id = None
 
-    if not list_result.data:
-        flash('List not found', 'error')
-        return redirect(url_for('index'))
+    # 1) If identifier looks like a UUID, fetch by id first
+    if UUID_RE.match(identifier):
+        list_result = supabase.table('lists').select('*, profiles(username)').eq('id', identifier).single().execute()
+        lst = list_result.data if list_result and list_result.data else None
 
-    lst = list_result.data
+        if not lst:
+            flash('List not found', 'error')
+            return redirect(url_for('index'))
+
+        list_id = identifier
+
+        # If the list has a slug, permanently redirect to the slug URL (canonical)
+        slug = lst.get('slug')
+        if slug:
+            return redirect(url_for('view_list', identifier=slug), code=301)
+
+    # 2) Otherwise fetch by slug
+    else:
+        list_result = supabase.table('lists').select('*, profiles(username)').eq('slug', identifier).single().execute()
+        lst = list_result.data if list_result and list_result.data else None
+
+        if not lst:
+            flash('List not found', 'error')
+            return redirect(url_for('index'))
+
+        list_id = lst['id']
 
     # Check access
     is_owner = 'user' in session and session['user']['id'] == lst['user_id']
@@ -383,9 +424,9 @@ def view_list(list_id):
         flash('This list is private', 'error')
         return redirect(url_for('index'))
 
-    # Get items
+    # Get items (use the true UUID list_id)
     items_result = supabase.table('list_items').select('*').eq('list_id', list_id).order('position').execute()
-    items = items_result.data if items_result.data else []
+    items = items_result.data if items_result and items_result.data else []
 
     # Check if current user has Spotify connected (for showing export button)
     current_user_has_spotify = False
@@ -396,8 +437,13 @@ def view_list(list_id):
         except Exception:
             pass
 
-    return render_template('view_list.html', list=lst, items=items, is_owner=is_owner,
-                          current_user_has_spotify=current_user_has_spotify)
+    return render_template(
+        'view_list.html',
+        list=lst,
+        items=items,
+        is_owner=is_owner,
+        current_user_has_spotify=current_user_has_spotify
+    )
 
 
 @app.route('/list/<list_id>/edit')

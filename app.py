@@ -10,11 +10,13 @@ import requests
 import base64
 import time
 from flask import Response, send_from_directory
+
 import re
 
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
-app = Flask(__name__)
-UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 def slugify(title: str) -> str:
     s = title.strip().lower()

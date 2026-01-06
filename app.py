@@ -388,65 +388,73 @@ def create_list():
     return render_template('create_list.html')
 
 
-@app.route('/list/<identifier>')
-def view_list(identifier):
+@app.route('/list/<list_id>')
+def view_list(list_id):
     """View a list (public or own) by UUID or slug. Redirect UUID -> slug when available."""
-    lst = None
-    list_id = None
+    try:
+        identifier = list_id  # keep old param name for url_for compatibility
 
-    # 1) If identifier looks like a UUID, fetch by id first
-    if UUID_RE.match(identifier):
-        list_result = supabase.table('lists').select('*, profiles(username)').eq('id', identifier).single().execute()
-        lst = list_result.data if list_result and list_result.data else None
+        lst = None
+        true_list_id = None
 
-        if not lst:
-            flash('List not found', 'error')
+        # UUID path
+        if UUID_RE.match(identifier):
+            list_result = supabase.table('lists').select('*, profiles(username)').eq('id', identifier).single().execute()
+            lst = list_result.data if list_result and getattr(list_result, "data", None) else None
+
+            if not lst:
+                flash('List not found', 'error')
+                return redirect(url_for('index'))
+
+            true_list_id = identifier
+
+            slug = lst.get('slug')
+            if slug:
+                # canonical slug URL
+                return redirect(url_for('view_list', list_id=slug), code=301)
+
+        # Slug path
+        else:
+            list_result = supabase.table('lists').select('*, profiles(username)').eq('slug', identifier).single().execute()
+            lst = list_result.data if list_result and getattr(list_result, "data", None) else None
+
+            if not lst:
+                flash('List not found', 'error')
+                return redirect(url_for('index'))
+
+            true_list_id = lst['id']
+
+        # Check access
+        is_owner = 'user' in session and session['user']['id'] == lst['user_id']
+        if not lst['is_public'] and not is_owner:
+            flash('This list is private', 'error')
             return redirect(url_for('index'))
 
-        list_id = identifier
+        # Get items (use the true UUID list_id)
+        items_result = supabase.table('list_items').select('*').eq('list_id', true_list_id).order('position').execute()
+        items = items_result.data if items_result and getattr(items_result, "data", None) else []
 
-        # If the list has a slug, permanently redirect to the slug URL (canonical)
-        slug = lst.get('slug')
-        if slug:
-            return redirect(url_for('view_list', identifier=slug), code=301)
+        # Spotify connected?
+        current_user_has_spotify = False
+        if 'user' in session:
+            try:
+                profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
+                current_user_has_spotify = bool(profile.data and profile.data.get('spotify_user_id'))
+            except Exception:
+                pass
 
-    # 2) Otherwise fetch by slug
-    else:
-        list_result = supabase.table('lists').select('*, profiles(username)').eq('slug', identifier).single().execute()
-        lst = list_result.data if list_result and list_result.data else None
+        return render_template(
+            'view_list.html',
+            list=lst,
+            items=items,
+            is_owner=is_owner,
+            current_user_has_spotify=current_user_has_spotify
+        )
 
-        if not lst:
-            flash('List not found', 'error')
-            return redirect(url_for('index'))
-
-        list_id = lst['id']
-
-    # Check access
-    is_owner = 'user' in session and session['user']['id'] == lst['user_id']
-    if not lst['is_public'] and not is_owner:
-        flash('This list is private', 'error')
+    except Exception as e:
+        flash(f"Server error loading list: {str(e)}", "error")
         return redirect(url_for('index'))
 
-    # Get items (use the true UUID list_id)
-    items_result = supabase.table('list_items').select('*').eq('list_id', list_id).order('position').execute()
-    items = items_result.data if items_result and items_result.data else []
-
-    # Check if current user has Spotify connected (for showing export button)
-    current_user_has_spotify = False
-    if 'user' in session:
-        try:
-            profile = supabase.table('profiles').select('spotify_user_id').eq('id', session['user']['id']).single().execute()
-            current_user_has_spotify = bool(profile.data and profile.data.get('spotify_user_id'))
-        except Exception:
-            pass
-
-    return render_template(
-        'view_list.html',
-        list=lst,
-        items=items,
-        is_owner=is_owner,
-        current_user_has_spotify=current_user_has_spotify
-    )
 
 
 @app.route('/list/<list_id>/edit')

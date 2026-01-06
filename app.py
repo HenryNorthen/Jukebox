@@ -9,7 +9,8 @@ import urllib.parse
 import requests
 import base64
 import time
-from flask import Response
+from flask import Response, send_from_directory
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -1975,6 +1976,10 @@ if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=debug_mode, host='0.0.0.0', port=port)
+
+@app.route("/robots.txt")
+def robots_txt():
+    return send_from_directory(app.static_folder, "robots.txt", mimetype="text/plain")
 
 @app.route("/sitemap.xml")
 def sitemap():

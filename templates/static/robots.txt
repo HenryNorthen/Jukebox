@@ -1,3 +1,6 @@
-User-agent: *
-Allow: /
-Sitemap: https://jukeboxd.net/sitemap.xml
+from flask import Response
+
+@app.route("/robots.txt")
+def robots():
+    content = "User-agent: *\nAllow: /\nSitemap: https://jukeboxd.net/sitemap.xml\n"
+    return Response(content, mimetype="text/plain")

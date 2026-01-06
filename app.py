@@ -24,6 +24,7 @@ def slugify(title: str) -> str:
     s = re.sub(r"(^-+|-+$)", "", s)
     return s or "list"
 
+app = Flask(__name__)
 app.config.from_object(Config)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
